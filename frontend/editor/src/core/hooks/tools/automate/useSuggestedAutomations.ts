@@ -60,15 +60,6 @@ export function useSuggestedAutomations(): SuggestedAutomation[] {
             },
           },
           {
-            operation: "ocr",
-            parameters: {
-              languages: ["eng"],
-              ocrType: "skip-text",
-              ocrRenderType: "hocr",
-              additionalOptions: ["clean", "cleanFinal"],
-            },
-          },
-          {
             operation: "convert",
             parameters: {
               fromExtension: "pdf",
@@ -271,15 +262,6 @@ export function useSuggestedAutomations(): SuggestedAutomation[] {
                 autoRotate: true,
                 combineImages: true,
               },
-            },
-          },
-          {
-            operation: "ocr",
-            parameters: {
-              languages: ["eng"],
-              ocrType: "skip-text",
-              ocrRenderType: "hocr",
-              additionalOptions: [],
             },
           },
         ],

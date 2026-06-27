@@ -30,7 +30,6 @@ import { addStampOperationConfig } from "@app/components/tools/addStamp/useAddSt
 import { addAttachmentsOperationConfig } from "@app/hooks/tools/addAttachments/useAddAttachmentsOperation";
 import { unlockPdfFormsOperationConfig } from "@app/hooks/tools/unlockPdfForms/useUnlockPdfFormsOperation";
 import { singleLargePageOperationConfig } from "@app/hooks/tools/singleLargePage/useSingleLargePageOperation";
-import { ocrOperationConfig } from "@app/hooks/tools/ocr/useOCROperation";
 import { convertOperationConfig } from "@app/hooks/tools/convert/useConvertOperation";
 import { removeCertificateSignOperationConfig } from "@app/hooks/tools/removeCertificateSign/useRemoveCertificateSignOperation";
 import { changePermissionsOperationConfig } from "@app/hooks/tools/changePermissions/useChangePermissionsOperation";
@@ -1349,30 +1348,6 @@ export function useTranslatedToolCatalog(): TranslatedToolCatalog {
         synonyms: getSynonyms(t, "convert"),
       },
 
-      ocr: {
-        icon: (
-          <LocalIcon
-            icon="quick-reference-all-outline-rounded"
-            width="1.5rem"
-            height="1.5rem"
-          />
-        ),
-        name: t("home.ocr.title", "OCR"),
-        component: lazy(() => import("@app/tools/OCR")),
-        description: t(
-          "home.ocr.desc",
-          "Extract text from scanned PDFs using Optical Character Recognition",
-        ),
-        categoryId: ToolCategoryId.RECOMMENDED_TOOLS,
-        subcategoryId: SubcategoryId.GENERAL,
-        maxFiles: -1,
-        endpoints: ["ocr-pdf"],
-        operationConfig: asRegistryConfig(ocrOperationConfig),
-        automationSettings: lazySettings(
-          () => import("@app/components/tools/ocr/OCRSettings"),
-        ),
-        synonyms: getSynonyms(t, "ocr"),
-      },
       redact: {
         icon: (
           <LocalIcon

@@ -397,7 +397,6 @@ public class EndpointConfiguration {
         addEndpointToGroup("Security", "sign");
 
         // Adding endpoints to "Other" group
-        addEndpointToGroup("Other", "ocr-pdf");
         addEndpointToGroup("Other", "extract-images");
         addEndpointToGroup("Other", "update-metadata");
         addEndpointToGroup("Other", "flatten");
@@ -452,7 +451,6 @@ public class EndpointConfiguration {
         addEndpointToGroup("CLI", "pdf-to-presentation");
         addEndpointToGroup("CLI", "pdf-to-html");
         addEndpointToGroup("CLI", "pdf-to-xml");
-        addEndpointToGroup("CLI", "ocr-pdf");
         addEndpointToGroup("CLI", "html-to-pdf");
         addEndpointToGroup("CLI", "url-to-pdf");
         addEndpointToGroup("CLI", "pdf-to-rtf");
@@ -561,12 +559,6 @@ public class EndpointConfiguration {
         /* ImageMagick */
         addEndpointToGroup("ImageMagick", "compress-pdf");
 
-        /* tesseract */
-        addEndpointToGroup("tesseract", "ocr-pdf");
-
-        /* OCRmyPDF */
-        addEndpointToGroup("OCRmyPDF", "ocr-pdf");
-
         // Multi-tool endpoints - endpoints that can be handled by multiple tools
         addEndpointAlternative("repair", "qpdf");
         addEndpointAlternative("repair", "Ghostscript");
@@ -575,8 +567,6 @@ public class EndpointConfiguration {
         addEndpointAlternative("compress-pdf", "Java");
         addEndpointAlternative("crop", "Ghostscript");
         addEndpointAlternative("crop", "Java");
-        addEndpointAlternative("ocr-pdf", "tesseract");
-        addEndpointAlternative("ocr-pdf", "OCRmyPDF");
 
         // file-to-pdf has multiple implementations
         addEndpointAlternative("file-to-pdf", "LibreOffice");

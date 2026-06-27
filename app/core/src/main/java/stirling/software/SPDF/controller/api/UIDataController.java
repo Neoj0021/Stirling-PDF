@@ -179,30 +179,6 @@ public class UIDataController {
         return ResponseEntity.ok(data);
     }
 
-    @GetMapping("/ocr-pdf")
-    @Operation(summary = "Get OCR PDF data")
-    public ResponseEntity<OcrData> getOcrPdfData() {
-        List<String> languages = getAvailableTesseractLanguages();
-
-        OcrData data = new OcrData();
-        data.setLanguages(languages);
-
-        return ResponseEntity.ok(data);
-    }
-
-    private List<String> getAvailableTesseractLanguages() {
-        String tessdataDir = runtimePathConfig.getTessDataPath();
-        java.io.File[] files = new java.io.File(tessdataDir).listFiles();
-        if (files == null) {
-            return Collections.emptyList();
-        }
-        return Arrays.stream(files)
-                .filter(file -> file.getName().endsWith(".traineddata"))
-                .map(file -> file.getName().replace(".traineddata", ""))
-                .filter(lang -> !"osd".equalsIgnoreCase(lang))
-                .sorted()
-                .toList();
-    }
 
     private List<FontResource> getFontNames() {
         List<FontResource> fontNames = new ArrayList<>();
@@ -281,11 +257,6 @@ public class UIDataController {
     public static class SignData {
         private List<SignatureFile> signatures;
         private List<FontResource> fonts;
-    }
-
-    @Data
-    public static class OcrData {
-        private List<String> languages;
     }
 
     @Data

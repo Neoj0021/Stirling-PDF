@@ -63,7 +63,6 @@ export default function Onboarding() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [analyticsModalDismissed, setAnalyticsModalDismissed] = useState(false);
-  const [firstLoginModalOpen, setFirstLoginModalOpen] = useState(false);
   const [mfaModalOpen, setMfaModalOpen] = useState(false);
   const accountLogout = useAccountLogout();
   const { signOut } = useAuth();
@@ -304,16 +303,6 @@ export default function Onboarding() {
     return () => removeAllGlows();
   }, [isTourOpen]);
 
-  // Handle first-login password change modal
-  useEffect(() => {
-    if (runtimeState.requiresPasswordChange === true) {
-      console.log("[Onboarding] User requires password change on first login.");
-      setFirstLoginModalOpen(true);
-    } else {
-      setFirstLoginModalOpen(false);
-    }
-  }, [runtimeState.requiresPasswordChange]);
-
   // Handle MFA setup modal
   useEffect(() => {
     if (runtimeState.requiresMfaSetup === true) {
@@ -459,35 +448,6 @@ export default function Onboarding() {
     );
   }
 
-  if (firstLoginModalOpen) {
-    const baseSlideDefinition = SLIDE_DEFINITIONS["first-login"];
-    const slideContent = baseSlideDefinition.createSlide({
-      osLabel: "",
-      osUrl: "",
-      selectedRole: null,
-      onRoleSelect: () => {},
-      firstLoginUsername: runtimeState.firstLoginUsername,
-      onPasswordChanged: handlePasswordChanged,
-      usingDefaultCredentials: runtimeState.usingDefaultCredentials,
-    });
-
-    return (
-      <OnboardingModalSlide
-        slideDefinition={baseSlideDefinition}
-        slideContent={slideContent}
-        runtimeState={runtimeState}
-        modalSlideCount={1}
-        currentModalSlideIndex={0}
-        onSkip={() => {}}
-        onAction={async (action) => {
-          if (action === "complete-close") {
-            handlePasswordChanged();
-          }
-        }}
-        allowDismiss={false}
-      />
-    );
-  }
 
   if (mfaModalOpen) {
     console.log("[Onboarding] Rendering MFA setup modal slide.");

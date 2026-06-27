@@ -1,6 +1,5 @@
 import React from "react";
-import { Center, ScrollArea, Text, Stack } from "@mantine/core";
-import CloudIcon from "@mui/icons-material/Cloud";
+import { ScrollArea } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import FileListItem from "@app/components/fileManager/FileListItem";
 import FileHistoryGroup from "@app/components/fileManager/FileHistoryGroup";
@@ -90,22 +89,7 @@ const FileListArea: React.FC<FileListAreaProps> = ({
     );
   }
 
-  // Google Drive placeholder
-  return (
-    <Center style={{ height: "12.5rem" }}>
-      <Stack align="center" gap="sm">
-        <CloudIcon
-          style={{ fontSize: "3rem", color: "var(--mantine-color-gray-5)" }}
-        />
-        <Text c="dimmed" ta="center">
-          {t(
-            "fileManager.googleDriveNotAvailable",
-            "Google Drive integration coming soon",
-          )}
-        </Text>
-      </Stack>
-    </Center>
-  );
+  return null;
 };
 
 export default FileListArea;

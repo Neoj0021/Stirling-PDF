@@ -380,7 +380,6 @@ class EndpointConfigurationGapTest {
             Set<String> all = config.getAllEndpoints();
             assertTrue(all.contains("merge-pdfs"));
             assertTrue(all.contains("compress-pdf"));
-            assertTrue(all.contains("ocr-pdf"));
             assertFalse(all.isEmpty());
         }
 

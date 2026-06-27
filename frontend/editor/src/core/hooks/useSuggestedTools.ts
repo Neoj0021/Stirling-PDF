@@ -40,11 +40,6 @@ const ALL_SUGGESTED_TOOLS: Omit<SuggestedTool, "href" | "onClick">[] = [
     title: "Split",
     icon: CropIcon,
   },
-  {
-    id: "ocr",
-    title: "OCR",
-    icon: TextFieldsIcon,
-  },
 ];
 
 export function useSuggestedTools(): SuggestedTool[] {
