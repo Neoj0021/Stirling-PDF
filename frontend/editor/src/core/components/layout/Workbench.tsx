@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense, lazy } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense, lazy } from "react";
 import { Box, Loader, Center } from "@mantine/core";
 import { useToolWorkflow } from "@app/contexts/ToolWorkflowContext";
 import { useFileHandler } from "@app/hooks/useFileHandler";
@@ -14,9 +14,11 @@ import { useCookieConsent } from "@app/hooks/useCookieConsent";
 import styles from "@app/components/layout/Workbench.module.css";
 
 import WorkbenchBar from "@app/components/shared/WorkbenchBar";
+import { DocumentTabBar } from "@app/components/shared/DocumentTabBar";
 import LandingPage from "@app/components/shared/LandingPage";
 import DismissAllErrorsButton from "@app/components/shared/DismissAllErrorsButton";
 import { ChatFAB } from "@app/components/chat/ChatFAB";
+import { useViewer } from "@app/contexts/ViewerContext";
 
 // Workbench panels are loaded on demand. Viewer pulls in pdfjs-dist and the
 // full @embedpdf plugin set; FileEditor/PageEditor are only needed once a file
@@ -56,6 +58,49 @@ export default function Workbench() {
   } = useToolWorkflow();
 
   const { handleToolSelect } = useToolWorkflow();
+  const { setActiveFileId } = useViewer();
+  const { addFiles } = useFileHandler();
+
+  // Global drop zone: accept new files dropped onto the workbench while a PDF is open
+  const [fileDragOver, setFileDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  const handleWorkbenchDragEnter = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("Files")) {
+      dragCounterRef.current += 1;
+      setFileDragOver(true);
+    }
+  }, []);
+
+  const handleWorkbenchDragLeave = useCallback(() => {
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setFileDragOver(false);
+  }, []);
+
+  const handleWorkbenchDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("Files")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  }, []);
+
+  const handleWorkbenchDrop = useCallback(
+    async (e: React.DragEvent) => {
+      dragCounterRef.current = 0;
+      setFileDragOver(false);
+      if (!e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length === 0) return;
+      const addedFiles = await addFiles(files);
+      // Switch viewer to first newly-added file
+      if (addedFiles.length > 0 && addedFiles[0].fileId) {
+        setActiveFileId(addedFiles[0].fileId as string);
+        setCurrentView("viewer");
+      }
+    },
+    [addFiles, setCurrentView, setActiveFileId],
+  );
 
   // Get navigation state - this is the source of truth
   const { selectedTool: selectedToolId } = useNavigationState();
@@ -63,7 +108,6 @@ export default function Workbench() {
   // Get tool registry from context (instead of direct hook call)
   const { toolRegistry } = useToolWorkflow();
   const selectedTool = selectedToolId ? toolRegistry[selectedToolId] : null;
-  const { addFiles } = useFileHandler();
   const hasFiles = activeFiles.length > 0;
   // Custom workbench views (e.g. Watched Folders) manage their own content and may
   // have no workbench files, but still need the bar's view switcher so users can
@@ -198,6 +242,10 @@ export default function Workbench() {
       className="flex-1 h-full min-w-0 relative flex flex-col"
       data-tour="workbench"
       style={{ backgroundColor: "var(--bg-background)", minWidth: 0 }}
+      onDragEnter={hasFiles ? handleWorkbenchDragEnter : undefined}
+      onDragLeave={hasFiles ? handleWorkbenchDragLeave : undefined}
+      onDragOver={hasFiles ? handleWorkbenchDragOver : undefined}
+      onDrop={hasFiles ? handleWorkbenchDrop : undefined}
     >
       {/* Workbench Bar - animates in/out based on file presence */}
       {currentView !== "myFiles" &&
@@ -218,11 +266,35 @@ export default function Workbench() {
           </div>
         )}
 
+      {/* Document tab bar - one tab per open file */}
+      <DocumentTabBar />
+
       {/* Dismiss All Errors Button */}
       <DismissAllErrorsButton />
 
       {/* Floating AI chat button + panel */}
       <ChatFAB />
+
+      {/* Full-workbench drop overlay — shown only when dragging a file in while files are open */}
+      {fileDragOver && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "color-mix(in srgb, var(--mantine-color-blue-6, #3b82f6) 12%, var(--bg-background))",
+            border: "2px dashed var(--mantine-color-blue-6, #3b82f6)",
+            pointerEvents: "none",
+          }}
+        >
+          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--mantine-color-blue-6, #3b82f6)" }}>
+            Drop to open
+          </span>
+        </div>
+      )}
 
       {/* Main content area */}
       <Box

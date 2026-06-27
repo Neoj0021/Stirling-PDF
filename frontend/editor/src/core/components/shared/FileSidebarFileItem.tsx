@@ -2,8 +2,6 @@ import { useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Menu, Tooltip } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
@@ -152,7 +150,7 @@ export interface FileItemProps {
   isViewedInViewer: boolean;
   thumbnailUrl?: string;
   onClick: (fileId: FileId) => void;
-  onEyeClick: (fileId: FileId, e: React.MouseEvent) => void;
+  onEyeClick?: (fileId: FileId, e: React.MouseEvent) => void;
   /** When true, the row can be dragged (e.g. onto a Watched Folder). */
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent, fileId: FileId) => void;
@@ -174,6 +172,8 @@ export interface FileItemProps {
   onVersionHistory?: (fileId: FileId) => void;
   /** Whether this file has more than one version (drives the menu item). */
   hasVersionHistory?: boolean;
+  /** Called when the user clicks the checkbox icon specifically (not the full row). */
+  onCheckboxClick?: (fileId: FileId) => void;
 }
 
 const MAX_VISIBLE_FOLDER_TAGS = 2;
@@ -201,6 +201,7 @@ export function FileItem({
   isUploadedToCloud = false,
   onVersionHistory,
   hasVersionHistory = false,
+  onCheckboxClick,
 }: FileItemProps) {
   const { t } = useTranslation();
   const ext = getFileExtension(name);
@@ -262,7 +263,16 @@ export function FileItem({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div className="file-sidebar-file-icon-wrapper">
+        <div
+          className="file-sidebar-file-icon-wrapper"
+          onClick={
+            onCheckboxClick
+              ? (e) => { e.stopPropagation(); onCheckboxClick(fileId); }
+              : undefined
+          }
+          role={onCheckboxClick ? "checkbox" : undefined}
+          aria-checked={onCheckboxClick ? isSelected : undefined}
+        >
           {isSelected ? (
             <div className="file-sidebar-file-check">
               <CheckIcon className="file-sidebar-check-svg" />
@@ -369,30 +379,6 @@ export function FileItem({
             </span>
           )}
         </div>
-        <button
-          className="file-sidebar-eye-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEyeClick(fileId, e);
-          }}
-          tabIndex={-1}
-          type="button"
-          aria-label={
-            isViewedInViewer
-              ? t("fileSidebar.fileItem.closeViewer", "Close viewer")
-              : t("fileSidebar.fileItem.openInViewer", "Open in viewer")
-          }
-        >
-          <VisibilityOutlinedIcon
-            className="file-sidebar-eye-open"
-            sx={{ fontSize: "1.1rem" }}
-          />
-          <VisibilityOffOutlinedIcon
-            className="file-sidebar-eye-closed"
-            sx={{ fontSize: "1.1rem" }}
-          />
-        </button>
-
         {(onDelete ||
           onSaveToCloud ||
           (hasVersionHistory && onVersionHistory)) && (

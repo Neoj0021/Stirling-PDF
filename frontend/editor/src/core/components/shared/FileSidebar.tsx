@@ -36,12 +36,12 @@ import FolderSpecialIcon from "@mui/icons-material/FolderSpecial";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import SettingsIcon from "@mui/icons-material/Settings";
 import type { FileId } from "@app/types/file";
 import { FileItem } from "@app/components/shared/FileSidebarFileItem";
+import { SpaceTreeSection } from "@app/components/shared/SpaceTreeSection";
+import { useSpaces } from "@app/contexts/SpaceContext";
 import BulkUploadToServerModal from "@app/components/shared/BulkUploadToServerModal";
-import { getFileOrigin } from "@app/components/filesPage/fileOrigin";
 import { VersionHistoryModal } from "@app/components/filesPage/VersionHistoryModal";
 import { DeleteFilesDialog } from "@app/components/filesPage/DeleteFilesDialog";
 import {
@@ -186,6 +186,7 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
     const { requestNavigation } = useNavigationGuard();
     const { activeFileId, setActiveFileId } = useViewer();
     const { addFiles } = useFileHandler();
+    const { fileSpaceMap, setActiveSpaceId: setSpaceId } = useSpaces();
     const indexedDB = useIndexedDB();
 
     // Each auth layer derives its own displayName from its native user shape.
@@ -354,12 +355,6 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
       }
     }, [pendingViewFileId, state.files.ids, setActiveFileId, navActions]);
 
-    const filteredFileStubs = searchQuery.trim()
-      ? allFileStubs.filter((stub) =>
-          stub.name.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-      : allFileStubs;
-
     // Handle search activation
     const handleSearchClick = useCallback(() => {
       if (onSearchClick) {
@@ -482,6 +477,62 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
     // Which file is currently open in the viewer - stable ID, never index-derived.
     const viewedWorkbenchId =
       currentWorkbench === "viewer" ? activeFileId : null;
+
+    // Toggle workbench membership via checkbox only — no viewer navigation.
+    const handleToggleWorkbench = useCallback(
+      async (fileId: FileId) => {
+        const stub = allFileStubs.find((s) => s.id === fileId);
+        if (!stub) return;
+        const alreadyInWorkbench = state.files.ids.some(
+          (id) => (id as string) === (stub.id as string),
+        );
+        if (alreadyInWorkbench) {
+          await fileActions.removeFiles([stub.id], false);
+        } else {
+          await fileActions.addStirlingFileStubs([stub]);
+        }
+      },
+      [allFileStubs, state.files.ids, fileActions],
+    );
+
+    // Open a single file in the viewer — auto-switches the active space to wherever the file lives.
+    const handleOpenFile = useCallback(
+      async (stub: StirlingFileStub) => {
+        // Switch active space to the one this file belongs to (null = Default).
+        const spaceId = fileSpaceMap[stub.id as string] ?? null;
+        setSpaceId(spaceId);
+
+        const alreadyInWorkbench = state.files.ids.some(
+          (id) => (id as string) === (stub.id as string),
+        );
+        if (!alreadyInWorkbench) {
+          if (state.files.ids.length > 0 && currentWorkbench === "viewer") {
+            navActions.setWorkbench("fileEditor");
+          }
+          await fileActions.addStirlingFileStubs([stub]);
+        }
+        setPendingViewFileId(stub.id as string);
+      },
+      [fileSpaceMap, setSpaceId, state.files.ids, currentWorkbench, fileActions, navActions, setPendingViewFileId],
+    );
+
+    // Open all files in a space: add missing ones to the workbench then view first.
+    const handleOpenSpaceFiles = useCallback(
+      async (stubs: StirlingFileStub[]) => {
+        if (stubs.length === 0) return;
+        const notInWorkbench = stubs.filter(
+          (s) => !state.files.ids.some((id) => (id as string) === (s.id as string)),
+        );
+        if (notInWorkbench.length > 0) {
+          if (state.files.ids.length > 0 && currentWorkbench === "viewer") {
+            navActions.setWorkbench("fileEditor");
+          }
+          await fileActions.addStirlingFileStubs(notInWorkbench);
+        }
+        setPendingViewFileId(stubs[0].id as string);
+      },
+      [state.files.ids, currentWorkbench, fileActions, navActions, setPendingViewFileId],
+    );
 
     const handleEyeClick = useCallback(
       async (fileId: FileId, _e: React.MouseEvent) => {
@@ -954,150 +1005,29 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
               </div>
             )}
 
-            {/* Files section - always visible when expanded */}
+            {/* Space tree - replaces the flat files list */}
             {!collapsed && (
-              <div className="file-sidebar-files-section sidebar-content-fade">
-                <div className="file-sidebar-section-header">
-                  <span className="file-sidebar-section-label">
-                    {t("fileSidebar.files", "Files")}
-                  </span>
-                  <button
-                    className="file-sidebar-section-btn file-sidebar-section-btn-external"
-                    onClick={() => navigate("/files")}
-                    title={t(
-                      "fileSidebar.openFileManager",
-                      "Browse all files & folders",
-                    )}
-                    type="button"
-                    data-testid="open-files-page"
-                  >
-                    <OpenInNewIcon sx={{ fontSize: "1rem" }} />
-                  </button>
-                  <button
-                    className="file-sidebar-section-btn file-sidebar-section-btn-add"
-                    onClick={() => nativeFileInputRef.current?.click()}
-                    title={t("fileSidebar.addFiles", "Add files")}
-                    type="button"
-                  >
-                    <AddIcon sx={{ fontSize: "1rem" }} />
-                  </button>
-                </div>
-
-                {!stubsLoaded ? (
-                  <div className="file-sidebar-loading">
-                    <Loader size="sm" color="var(--text-muted)" />
-                  </div>
-                ) : filteredFileStubs.length > 0 ? (
-                  <div className="file-sidebar-file-list">
-                    {filteredFileStubs.map((stub) => {
-                      const workbenchFileId = state.files.ids.find(
-                        (id) => (id as string) === (stub.id as string),
-                      );
-                      const isInWorkbench = !!workbenchFileId;
-                      // On Watched Folders, the tick means "this file is already in
-                      // the open folder"; on the folder home (no folder open) a
-                      // click is a no-op, so show no tick at all.
-                      const isSelected = isWatchedFoldersActive
-                        ? activeWatchedFolderId != null &&
-                          (folderMembership
-                            .get(stub.id as string)
-                            ?.includes(activeWatchedFolderId) ??
-                            false)
-                        : isInWorkbench;
-                      // Membership dots only on the Watched Folders home (the folder
-                      // grid, no folder open). Inside a specific folder the tick
-                      // already shows "in this folder"; in other views they'd just
-                      // be noise.
-                      const showFolderDots =
-                        WATCHED_FOLDERS_ENABLED &&
-                        isWatchedFoldersActive &&
-                        activeWatchedFolderId === null;
-                      const memberFolders = showFolderDots
-                        ? (folderMembership.get(stub.id as string) ?? [])
-                            .map((fid) => folderById.get(fid))
-                            .filter((f): f is NonNullable<typeof f> => !!f)
-                            .map((f) => ({
-                              id: f.id,
-                              name: f.name,
-                              accentColor: f.accentColor,
-                            }))
-                        : [];
-                      // Both active and viewed-in-viewer are ID-based - never index-based.
-                      const isViewedInViewer = !!(
-                        viewedWorkbenchId &&
-                        viewedWorkbenchId === (stub.id as string)
-                      );
-                      const isActive = isViewedInViewer;
-                      // In-memory thumbnail may be fresher than the IndexedDB stub.
-                      // Encrypted files never get a raster thumbnail - use undefined
-                      // so the sidebar icon is shown instead of a stale canvas thumbnail.
-                      const isEncryptedFile =
-                        stub.processedFile?.isEncrypted === true;
-                      const thumbnailUrl = isEncryptedFile
-                        ? undefined
-                        : (workbenchFileId
-                            ? state.files.byId[workbenchFileId]?.thumbnailUrl
-                            : undefined) || stub.thumbnailUrl;
-                      // local | cloud | shared-with-me - drives the cloud badge
-                      // and the Upload-vs-Update menu label.
-                      const fileOrigin = getFileOrigin(stub);
-                      return (
-                        <FileItem
-                          key={stub.id}
-                          fileId={stub.id}
-                          name={stub.name}
-                          size={stub.size}
-                          lastModified={stub.lastModified}
-                          isSelected={isSelected}
-                          isActive={isActive}
-                          isViewedInViewer={isViewedInViewer}
-                          thumbnailUrl={thumbnailUrl}
-                          onClick={handleFileClick}
-                          onEyeClick={handleEyeClick}
-                          draggable={isWatchedFoldersActive}
-                          onDragStart={handleWatchedFolderDragStart}
-                          folders={memberFolders}
-                          onFolderClick={openWatchedFolder}
-                          policies={
-                            policyFileBadges.get(stub.id as string) ?? []
-                          }
-                          onDelete={
-                            isWatchedFoldersActive
-                              ? undefined
-                              : handleSidebarDelete
-                          }
-                          onSaveToCloud={
-                            isWatchedFoldersActive
-                              ? undefined
-                              : handleSaveToCloud
-                          }
-                          canSaveToCloud={
-                            storageEnabled && fileOrigin !== "shared-with-me"
-                          }
-                          isUploadedToCloud={fileOrigin === "cloud"}
-                          onVersionHistory={
-                            isWatchedFoldersActive
-                              ? undefined
-                              : handleVersionHistory
-                          }
-                          hasVersionHistory={(stub.versionNumber ?? 1) > 1}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  !searchActive && (
-                    <div className="file-sidebar-empty">
-                      <p className="file-sidebar-empty-text">
-                        {t("fileSidebar.noFiles", "No files yet")}
-                      </p>
-                      <p className="file-sidebar-empty-hint">
-                        {t("fileSidebar.dropHint", "Open files to get started")}
-                      </p>
-                    </div>
-                  )
-                )}
-              </div>
+              <SpaceTreeSection
+                allFileStubs={allFileStubs}
+                stubsLoaded={stubsLoaded}
+                workbenchFileIds={
+                  new Set(state.files.ids.map((id) => id as string))
+                }
+                viewedWorkbenchId={viewedWorkbenchId}
+                onOpenFile={handleOpenFile}
+                onOpenSpaceFiles={handleOpenSpaceFiles}
+                onToggleFile={handleToggleWorkbench}
+                onEyeClick={handleEyeClick}
+                onDelete={isWatchedFoldersActive ? undefined : handleSidebarDelete}
+                onSaveToCloud={
+                  isWatchedFoldersActive ? undefined : handleSaveToCloud
+                }
+                canSaveToCloud={storageEnabled}
+                onVersionHistory={
+                  isWatchedFoldersActive ? undefined : handleVersionHistory
+                }
+                searchQuery={searchQuery}
+              />
             )}
           </div>
         </div>

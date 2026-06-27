@@ -23,6 +23,35 @@ Stirling PDF is a powerful, open-source PDF editing platform. Run it as a person
 
 ![Stirling PDF - Dashboard](images/home-light.png)
 
+## Custom Modifications (nibir build)
+
+This fork contains the following changes on top of upstream Stirling PDF:
+
+### Editor Sidebar — Spaces
+
+- **Spaces panel** replaces the old files list in the left sidebar. Files are grouped into named spaces (folders that live only inside the app, not on disk).
+- **Drag files into spaces** — drag a file row onto a space header to assign it; drag onto Default to unassign.
+- **Default space** shows files with no space assignment, collapsible.
+- **Click a space header** to activate it and open all its files in the workbench at once.
+- **Click a file row** to open it in the viewer. The active space switches automatically to wherever that file lives.
+- **Checkbox (icon area only)** toggles workbench membership without opening the file. A checkmark appears only when you explicitly check a file this way.
+- **Space color** — pick a color from the kebab menu (⋮) on any space. Color-filter dots appear beside the SPACES header when ≥ 2 distinct colors are in use; click a dot to filter the list.
+- **Drag-and-drop OS files** onto the workbench area (while a PDF is already open) to add new files directly.
+
+### Document Tab Bar
+
+A tab bar appears above the workbench showing one tab per open file. Tabs filter to the active space. Clicking × on a tab removes that file from the workbench.
+
+### Sign Tool — Saved Signatures
+
+The Saved tab now shows all saved signatures as a scrollable list rather than a one-at-a-time carousel. Click a card to place the signature. Hover to reveal rename (pencil) and delete icons. Inline rename edits the label without leaving the list. Up to 10 signatures can be saved in browser storage.
+
+### No Login Required
+
+`security.enableLogin` is set to `false` in `app/core/configs/settings.yml`. The app opens directly without a login page. To re-enable authentication, set it back to `true` and restart.
+
+---
+
 ## Key Capabilities
 
 - **Everywhere you work** - Desktop client, browser UI, and self-hosted server with a private API.
