@@ -179,7 +179,6 @@ public class UIDataController {
         return ResponseEntity.ok(data);
     }
 
-
     private List<FontResource> getFontNames() {
         List<FontResource> fontNames = new ArrayList<>();
         fontNames.addAll(getFontNamesFromLocation("classpath:static/fonts/*.woff2"));
