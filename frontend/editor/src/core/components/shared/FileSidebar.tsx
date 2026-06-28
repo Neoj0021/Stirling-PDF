@@ -37,6 +37,7 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import SettingsIcon from "@mui/icons-material/Settings";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import type { FileId } from "@app/types/file";
 import { FileItem } from "@app/components/shared/FileSidebarFileItem";
 import { SpaceTreeSection } from "@app/components/shared/SpaceTreeSection";
@@ -275,6 +276,13 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
     // Kebab delete: local-only files go immediately (cheap, re-addable). When
     // the file is also on the cloud, open the choice dialog so the user picks
     // where to remove it from.
+    const handleRename = useCallback(
+      (fileId: FileId, newName: string) => {
+        fileActions.updateStirlingFileStub(fileId, { name: newName });
+      },
+      [fileActions],
+    );
+
     const handleSidebarDelete = useCallback(
       async (fileId: FileId) => {
         const stub = allFileStubs.find((s) => s.id === fileId);
@@ -291,6 +299,17 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
       },
       [allFileStubs, fileActions, refreshStubs],
     );
+
+    // Checkbox-selected files in the Spaces tree, for bulk actions.
+    const [selectedSpaceFileIds, setSelectedSpaceFileIds] = useState<string[]>(
+      [],
+    );
+
+    const handleBulkDelete = useCallback(async () => {
+      if (selectedSpaceFileIds.length === 0) return;
+      await fileActions.removeFiles(selectedSpaceFileIds as FileId[], true);
+      await refreshStubs();
+    }, [selectedSpaceFileIds, fileActions, refreshStubs]);
 
     const handleConfirmSidebarDelete = useCallback(
       async (scope: DeleteScope) => {
@@ -1026,6 +1045,8 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
                 onVersionHistory={
                   isWatchedFoldersActive ? undefined : handleVersionHistory
                 }
+                onRename={isWatchedFoldersActive ? undefined : handleRename}
+                onSelectionChange={setSelectedSpaceFileIds}
                 searchQuery={searchQuery}
               />
             )}
@@ -1055,6 +1076,25 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmSidebarDelete}
         />
+
+        {/* Bulk-delete bar — shown above the settings bar when one or more files
+            are checkbox-selected in the Spaces tree. */}
+        {!collapsed && selectedSpaceFileIds.length >= 1 && (
+          <button
+            type="button"
+            className="file-sidebar-bulk-delete"
+            onClick={handleBulkDelete}
+          >
+            <DeleteOutlineIcon sx={{ fontSize: "1.1rem" }} />
+            <span className="sidebar-content-fade">
+              {selectedSpaceFileIds.length === 1
+                ? t("fileSidebar.deleteSelectedOne", "Delete 1 item")
+                : t("fileSidebar.deleteSelected", "Delete {{count}} items", {
+                    count: selectedSpaceFileIds.length,
+                  })}
+            </span>
+          </button>
+        )}
 
         {/* Bottom bar: user name + settings */}
         <Tooltip

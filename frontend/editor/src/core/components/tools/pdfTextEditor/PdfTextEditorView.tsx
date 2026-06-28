@@ -48,6 +48,10 @@ import {
   getImageBounds,
   pageDimensions,
 } from "@app/tools/pdfTextEditor/pdfTextEditorUtils";
+import {
+  restorePersistedFonts,
+  FONTS_UPDATED_EVENT,
+} from "@app/tools/pdfTextEditor/fontStorage";
 
 const MAX_RENDER_WIDTH = 820;
 const MIN_BOX_SIZE = 18;
@@ -116,6 +120,27 @@ const buildFontFamilyName = (font: PdfJsonFont): string => {
       ? preferred
       : (font.uid ?? font.id ?? "font").toString();
   return `pdf-font-${identifier.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+};
+
+// Weight/style tokens that aren't part of a font family name.
+const FONT_VARIANT_TOKENS = new Set([
+  "thin", "extralight", "ultralight", "light", "regular", "normal", "book",
+  "medium", "semibold", "demibold", "demi", "bold", "extrabold", "ultrabold",
+  "black", "heavy", "italic", "oblique", "bolditalic", "lightitalic",
+  "mediumitalic", "semibolditalic", "condensed", "expanded",
+]);
+
+/**
+ * Reduce a PDF font name to a normalized family key for matching against
+ * installed user fonts. "ABCDEF+Lato-Bold" → "lato", "OpenSans-Italic" → "opensans".
+ */
+const familyKeyFromName = (name: string): string => {
+  const stripped = (name ?? "").replace(/^[A-Z]{6}\+/, "");
+  const parts = stripped.split(/[-_\s]+/).filter(Boolean);
+  const kept = parts.filter(
+    (p, i) => i === 0 || !FONT_VARIANT_TOKENS.has(p.toLowerCase()),
+  );
+  return kept.join("").toLowerCase().replace(/[^a-z0-9]/g, "");
 };
 
 const getCaretOffset = (element: HTMLElement): number => {
@@ -357,6 +382,25 @@ const PdfTextEditorView = ({ data }: PdfTextEditorViewProps) => {
   const [fontFamilies, setFontFamilies] = useState<Map<string, string>>(
     new Map(),
   );
+  // Bumped whenever document.fonts changes (install / restore / load) so the
+  // available-family map below recomputes and missing PDF fonts can re-resolve.
+  const [fontsVersion, setFontsVersion] = useState(0);
+
+  // Normalized-family-key → actual family name for every font currently in
+  // document.fonts (installed, restored, or system). Lets a missing PDF font like
+  // "Lato-Bold" resolve to a usable "Lato" face. Declared before getFontFamily so
+  // it can be referenced in that callback's dependency list.
+  const availableFamilies = useMemo(() => {
+    const map = new Map<string, string>();
+    if (typeof document === "undefined" || !document.fonts) return map;
+    document.fonts.forEach((face) => {
+      const family = face.family.replace(/['"]/g, "");
+      const key = familyKeyFromName(family);
+      if (key && !map.has(key)) map.set(key, family);
+    });
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontsVersion]);
   const [textScales, setTextScales] = useState<Map<string, number>>(new Map());
   const measurementKeyRef = useRef<string>("");
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -544,6 +588,13 @@ const PdfTextEditorView = ({ data }: PdfTextEditorViewProps) => {
       const fontName = font?.standard14Name || font?.baseName || "";
       const lowerName = fontName.toLowerCase();
 
+      // Before falling back to web-safe fonts, try any font currently loaded in
+      // the browser (e.g. a downloaded "Lato" for a missing "Lato-Bold").
+      const availableFamily = availableFamilies.get(familyKeyFromName(fontName));
+      if (availableFamily) {
+        return `'${availableFamily}', sans-serif`;
+      }
+
       if (lowerName.includes("times")) {
         return '"Times New Roman", Times, serif';
       }
@@ -559,7 +610,7 @@ const PdfTextEditorView = ({ data }: PdfTextEditorViewProps) => {
 
       return "Arial, Helvetica, sans-serif";
     },
-    [resolveFont, fontFamilies],
+    [resolveFont, fontFamilies, availableFamilies],
   );
 
   useEffect(() => {
@@ -849,6 +900,35 @@ const PdfTextEditorView = ({ data }: PdfTextEditorViewProps) => {
     });
     return metrics;
   }, [pdfDocument?.fonts]);
+
+  // Pull user-installed fonts from the server into document.fonts on mount, and
+  // bump fontsVersion whenever the font set changes so getFontFamily re-resolves.
+  // This is what makes a freshly installed font auto-apply to the canvas without
+  // a manual reload.
+  useEffect(() => {
+    let cancelled = false;
+    const bump = () => {
+      if (!cancelled) setFontsVersion((v) => v + 1);
+    };
+    // Re-pull from the server, wait for the engine to settle, then re-resolve.
+    const reload = () => {
+      restorePersistedFonts()
+        .then(() => document.fonts?.ready)
+        .catch(() => {})
+        .finally(bump);
+    };
+
+    reload();
+    window.addEventListener(FONTS_UPDATED_EVENT, reload);
+    if (typeof document !== "undefined" && document.fonts) {
+      document.fonts.addEventListener("loadingdone", bump);
+    }
+    return () => {
+      cancelled = true;
+      window.removeEventListener(FONTS_UPDATED_EVENT, reload);
+      document.fonts?.removeEventListener("loadingdone", bump);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof FontFace === "undefined") {
@@ -1233,7 +1313,7 @@ const PdfTextEditorView = ({ data }: PdfTextEditorViewProps) => {
     }
 
     // Create a stable key for this measurement configuration
-    const currentKey = `${selectedPage}-${fontFamilies.size}-${autoScaleText}`;
+    const currentKey = `${selectedPage}-${fontFamilies.size}-${fontsVersion}-${autoScaleText}`;
 
     // Skip if we've already measured for this configuration
     if (measurementKeyRef.current === currentKey) {
@@ -1320,6 +1400,7 @@ const PdfTextEditorView = ({ data }: PdfTextEditorViewProps) => {
     pageHeight,
     scale,
     fontFamilies.size,
+    fontsVersion,
     selectedPage,
     isParagraphLayout,
     resolveGroupWidth,

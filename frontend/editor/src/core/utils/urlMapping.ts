@@ -48,8 +48,6 @@ export const URL_TO_TOOL_MAP: Record<string, ToolId> = {
   // Content manipulation
   "/sanitize": "sanitize",
   "/sanitize-pdf": "sanitize",
-  "/ocr": "ocr",
-  "/ocr-pdf": "ocr",
   "/watermark": "watermark",
   "/add-watermark": "watermark",
   "/add-image": "addImage",

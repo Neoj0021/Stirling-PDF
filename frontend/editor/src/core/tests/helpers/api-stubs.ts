@@ -63,7 +63,6 @@ const ALL_BACKEND_ENDPOINTS = [
   "split",
   "merge",
   "convert",
-  "ocr",
   "add-image",
   "rotate",
   "annotate",

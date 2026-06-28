@@ -80,11 +80,6 @@
       "title": "Convert - Stirling PDF",
       "description": "Convert files to and from PDF format"
     },
-    "ocr": {
-      "image": "/og_images/ocr.png",
-      "title": "OCR - Stirling PDF",
-      "description": "Extract text from scanned PDFs using Optical Character Recognition"
-    },
     "addImage": {
       "image": "/og_images/add-image.png",
       "title": "Add Image - Stirling PDF",
@@ -502,7 +497,6 @@
     "/split": "split",
     "/merge": "merge",
     "/convert": "convert",
-    "/ocr": "ocr",
     "/add-image": "addImage",
     "/rotate": "rotate",
     "/annotate": "annotate",
@@ -569,7 +563,6 @@
     "/remove-certificate-sign": "removeCertSign",
     "/unlock-pdf-forms": "unlockPDFForms",
     "/sanitize-pdf": "sanitize",
-    "/ocr-pdf": "ocr",
     "/add-watermark": "watermark",
     "/single-large-page": "pdfToSinglePage",
     "/auto-split-pdf": "split",

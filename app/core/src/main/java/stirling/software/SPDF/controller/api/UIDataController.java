@@ -6,14 +6,20 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 
 import io.swagger.v3.oas.annotations.Operation;
 
@@ -225,6 +231,87 @@ public class UIDataController {
         }
     }
 
+    /** Install a user-supplied font file permanently under customFiles/static/fonts/. */
+    @PostMapping(value = "/fonts/install", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @io.swagger.v3.oas.annotations.Operation(summary = "Install a font file permanently")
+    public ResponseEntity<InstalledFontData> installFont(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("family") String family,
+            @RequestParam("weight") String weight,
+            @RequestParam("style") String style)
+            throws IOException {
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Build a safe filename: strip non-alphanumeric/space, spaces→hyphens
+        String safeName = family.replaceAll("[^a-zA-Z0-9 ]", "").trim().replace(" ", "-");
+        String filename = safeName + "-" + weight + "-" + style + ".woff2";
+
+        Path fontsDir =
+                Path.of(
+                        stirling.software.common.configuration.InstallationPathConfig
+                                .getStaticPath(),
+                        "fonts");
+        Files.createDirectories(fontsDir);
+        Path target = fontsDir.resolve(filename);
+        Files.write(target, file.getBytes());
+
+        // /fonts/** is served with a 1-year immutable cache, so re-installing the
+        // same filename must change the URL or browsers keep the stale bytes.
+        long version = Files.getLastModifiedTime(target).toMillis();
+
+        InstalledFontData data = new InstalledFontData();
+        data.setFamily(family);
+        data.setWeight(weight);
+        data.setStyle(style);
+        data.setUrl("/fonts/" + filename + "?v=" + version);
+        return ResponseEntity.ok(data);
+    }
+
+    /** Return metadata for all user-installed fonts in customFiles/static/fonts/. */
+    @GetMapping("/fonts/installed")
+    @io.swagger.v3.oas.annotations.Operation(summary = "List user-installed fonts")
+    public ResponseEntity<List<InstalledFontData>> getInstalledFonts() {
+        Path fontsDir =
+                Path.of(
+                        stirling.software.common.configuration.InstallationPathConfig
+                                .getStaticPath(),
+                        "fonts");
+        if (!Files.exists(fontsDir)) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+
+        List<InstalledFontData> result = new ArrayList<>();
+        Pattern p = Pattern.compile("^(.+)-(\\d+)-(normal|italic|oblique)\\.woff2$");
+
+        try (Stream<Path> paths = Files.list(fontsDir)) {
+            paths.forEach(
+                    path -> {
+                        String name = path.getFileName().toString();
+                        Matcher m = p.matcher(name);
+                        if (m.matches()) {
+                            long version;
+                            try {
+                                version = Files.getLastModifiedTime(path).toMillis();
+                            } catch (IOException e) {
+                                version = 0L;
+                            }
+                            InstalledFontData d = new InstalledFontData();
+                            d.setFamily(m.group(1).replace("-", " "));
+                            d.setWeight(m.group(2));
+                            d.setStyle(m.group(3));
+                            d.setUrl("/fonts/" + name + "?v=" + version);
+                            result.add(d);
+                        }
+                    });
+        } catch (IOException e) {
+            log.error("Failed to list installed fonts", e);
+        }
+        return ResponseEntity.ok(result);
+    }
+
     // Data classes
     @Data
     public static class FooterData {
@@ -256,6 +343,14 @@ public class UIDataController {
     public static class SignData {
         private List<SignatureFile> signatures;
         private List<FontResource> fonts;
+    }
+
+    @Data
+    public static class InstalledFontData {
+        private String family;
+        private String weight;
+        private String style;
+        private String url;
     }
 
     @Data

@@ -143,10 +143,7 @@ export const POLICY_CONFIG: Record<string, PolicyConfigDef> = {
     summary:
       "Classifies documents, extracts structured data, enforces naming, and normalizes pages.",
     rules: ["Classify", "Extract", "Name", "Normalize"],
-    defaultOperations: [
-      { operation: "ocr", parameters: {} },
-      { operation: "flatten", parameters: {} },
-    ],
+    defaultOperations: [{ operation: "flatten", parameters: {} }],
     scopeLabel: "All PDFs on this device",
     // Policy-level controls only — the per-tool params (OCR level, extract
     // tables, naming, normalize, rotate...) live in the Workflow step.

@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Box,
+  Button,
   Code,
   Collapse,
   Divider,
   Flex,
   Group,
   List,
+  Loader,
   Paper,
   Stack,
   Text,
@@ -24,11 +26,23 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
 import { PdfJsonDocument } from "@app/tools/pdfTextEditor/pdfTextEditorTypes";
 import {
+  canRenderWithFont,
+  fetchInstalledFonts,
+  FONTS_UPDATED_EVENT,
+  injectFontFaceRules,
+  installFontOnServer,
+  invalidateFontCache,
+  notifyFontsUpdated,
+  pickLatinWoff2Url,
+  restorePersistedFonts,
+} from "@app/tools/pdfTextEditor/fontStorage";
+import {
   analyzeDocumentFonts,
   DocumentFontAnalysis,
   FontAnalysis,
   getFontStatusColor,
   getFontStatusDescription,
+  normalizeFontFamilyKey,
 } from "@app/tools/pdfTextEditor/fontAnalysis";
 import LocalIcon from "@app/components/shared/LocalIcon";
 import { Tooltip as CustomTooltip } from "@app/components/shared/Tooltip";
@@ -74,9 +88,120 @@ const FontStatusBadge = ({ analysis }: { analysis: FontAnalysis }) => {
   );
 };
 
+/** Parse a PDF font name into a Google Fonts–compatible family + variant. */
+function parseFontVariant(baseName: string): { family: string; weight: string; style: string } {
+  const name = baseName.replace(/^[A-Z]{6}\+/, "");
+  const parts = name.split(/[-_]/);
+  if (parts.length === 1) return { family: parts[0], weight: "400", style: "normal" };
+
+  const weightMap: Record<string, string> = {
+    thin: "100", extralight: "200", ultralight: "200", light: "300",
+    medium: "500", semibold: "600", demibold: "600",
+    extrabold: "800", ultrabold: "800", black: "900", heavy: "900", bold: "700",
+  };
+  const compoundMap: Record<string, { weight: string; style: string }> = {
+    bolditalic: { weight: "700", style: "italic" },
+    lightitalic: { weight: "300", style: "italic" },
+    mediumitalic: { weight: "500", style: "italic" },
+    semibolditalic: { weight: "600", style: "italic" },
+    extrabolditalic: { weight: "800", style: "italic" },
+    blackitalic: { weight: "900", style: "italic" },
+  };
+
+  const familyParts: string[] = [parts[0]];
+  let weight = "400";
+  let style = "normal";
+
+  for (let i = 1; i < parts.length; i++) {
+    const seg = parts[i].toLowerCase();
+    if (compoundMap[seg]) {
+      weight = compoundMap[seg].weight;
+      style = compoundMap[seg].style;
+    } else if (weightMap[seg]) {
+      weight = weightMap[seg];
+    } else if (seg === "italic") {
+      style = "italic";
+    } else if (seg === "oblique") {
+      style = "oblique";
+    } else if (seg !== "regular" && seg !== "normal") {
+      familyParts.push(parts[i]);
+    }
+  }
+  return { family: familyParts.join(" "), weight, style };
+}
+
+/**
+ * Download the correct (basic-Latin) subset from Google Fonts, install it on the
+ * server, register it in document.fonts, then verify it actually renders.
+ * Returns true only if the font is genuinely usable afterwards.
+ */
+async function downloadAndInstallFont(baseName: string): Promise<boolean> {
+  const { family, weight, style } = parseFontVariant(baseName);
+  const ital = style === "italic" ? "1" : "0";
+
+  const cssUrl =
+    `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}` +
+    `:ital,wght@${ital},${weight}&display=swap`;
+
+  const cssResp = await fetch(cssUrl);
+  if (!cssResp.ok)
+    throw new Error(`"${family}" not found on Google Fonts (${cssResp.status})`);
+
+  const css = await cssResp.text();
+  const woff2Url = pickLatinWoff2Url(css);
+  if (!woff2Url) throw new Error("No Latin woff2 URL in Google Fonts response");
+
+  const fontResp = await fetch(woff2Url);
+  if (!fontResp.ok) throw new Error("Failed to download font file");
+
+  const buffer = await fontResp.arrayBuffer();
+
+  // Save permanently to the server (customFiles/static/fonts/)
+  const installed = await installFontOnServer(buffer, family, weight, style);
+
+  // Register immediately in this session from the freshly downloaded bytes
+  const face = new FontFace(family, buffer, { weight, style });
+  await face.load();
+  document.fonts.add(face);
+
+  // Bust cache and refresh the injected <style> block with all server fonts
+  invalidateFontCache();
+  injectFontFaceRules([installed, ...(await fetchInstalledFonts(true))]);
+
+  // Honest confirmation: prove the glyphs actually render
+  const usable = await canRenderWithFont(family, weight, style);
+
+  // Broadcast AFTER the font is loaded so the validation panel and the editor
+  // canvas both auto re-validate (Missing → Perfect) without a manual reload.
+  await notifyFontsUpdated();
+
+  return usable;
+}
+
+// Button-only states. Whether the font actually works is reflected by the real
+// analysis status (PERFECT once it renders), not by a separate badge here.
+type DownloadState = "idle" | "downloading" | "unusable" | "error";
+
 const FontDetailItem = ({ analysis }: { analysis: FontAnalysis }) => {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const [downloadState, setDownloadState] = useState<DownloadState>("idle");
+  const [downloadError, setDownloadError] = useState("");
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDownloadState("downloading");
+    setDownloadError("");
+    try {
+      const usable = await downloadAndInstallFont(analysis.baseName);
+      // On success the parent re-validates and the status flips to PERFECT,
+      // hiding this box. If it still can't render, surface that here.
+      setDownloadState(usable ? "idle" : "unusable");
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "Download failed");
+      setDownloadState("error");
+    }
+  };
 
   return (
     <Paper
@@ -195,6 +320,54 @@ const FontDetailItem = ({ analysis }: { analysis: FontAnalysis }) => {
                 </List>
               </Box>
             )}
+
+            {/* Download + install for missing fonts */}
+            {analysis.status === "missing" && (
+              <Box
+                mt={4}
+                p="xs"
+                style={{
+                  background: "rgba(239,68,68,0.07)",
+                  borderRadius: 6,
+                  border: "1px solid rgba(239,68,68,0.18)",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {downloadState === "downloading" ? (
+                  <Group gap={6}>
+                    <Loader size="xs" color="red" />
+                    <Text size="xs" c="dimmed">
+                      {t("pdfTextEditor.fontAnalysis.downloading", "Downloading font…")}
+                    </Text>
+                  </Group>
+                ) : (
+                  <Stack gap={4}>
+                    {downloadState === "unusable" && (
+                      <Text size="xs" c="orange">
+                        {t(
+                          "pdfTextEditor.fontAnalysis.unusable",
+                          "Downloaded, but it still can't render this text. The font may not be on Google Fonts.",
+                        )}
+                      </Text>
+                    )}
+                    {downloadState === "error" && (
+                      <Text size="xs" c="red">{downloadError}</Text>
+                    )}
+                    <Button
+                      size="xs"
+                      variant="light"
+                      color="red"
+                      leftSection={<FontDownloadIcon sx={{ fontSize: 14 }} />}
+                      onClick={handleDownload}
+                    >
+                      {downloadState === "error" || downloadState === "unusable"
+                        ? t("pdfTextEditor.fontAnalysis.retry", "Retry download")
+                        : t("pdfTextEditor.fontAnalysis.downloadInstall", "Download & install font")}
+                    </Button>
+                  </Stack>
+                )}
+              </Box>
+            )}
           </Stack>
         </Collapse>
       </Stack>
@@ -210,9 +383,44 @@ const FontStatusPanel: React.FC<FontStatusPanelProps> = ({
 }) => {
   const { t } = useTranslation();
 
+  // Normalized family keys of missing fonts that have a locally-installed match
+  // verified to actually render. Feeds the analysis so they report as PERFECT.
+  const [usableKeys, setUsableKeys] = useState<Set<string>>(new Set());
+
+  // Restore installed fonts, then verify which missing fonts now genuinely
+  // render. Re-runs whenever the document, page, or installed font set changes.
+  useEffect(() => {
+    let cancelled = false;
+
+    const verify = async () => {
+      await restorePersistedFonts().catch(() => {});
+      await window.document.fonts.ready.catch(() => {});
+      const raw = analyzeDocumentFonts(document, pageIndex);
+      const missing = raw.fonts.filter((f) => f.status === "missing");
+      const keys = new Set<string>();
+      await Promise.all(
+        missing.map(async (f) => {
+          const { family, weight, style } = parseFontVariant(f.baseName);
+          if (await canRenderWithFont(family, weight, style)) {
+            keys.add(normalizeFontFamilyKey(f.baseName));
+          }
+        }),
+      );
+      if (!cancelled) setUsableKeys(keys);
+    };
+
+    verify();
+    const onUpdate = () => verify();
+    window.addEventListener(FONTS_UPDATED_EVENT, onUpdate);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(FONTS_UPDATED_EVENT, onUpdate);
+    };
+  }, [document, pageIndex]);
+
   const fontAnalysis: DocumentFontAnalysis = useMemo(
-    () => analyzeDocumentFonts(document, pageIndex),
-    [document, pageIndex],
+    () => analyzeDocumentFonts(document, pageIndex, usableKeys),
+    [document, pageIndex, usableKeys],
   );
 
   const { canReproducePerfectly, hasWarnings, summary, fonts } = fontAnalysis;

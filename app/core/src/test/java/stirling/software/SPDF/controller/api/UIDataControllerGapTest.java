@@ -321,63 +321,6 @@ class UIDataControllerGapTest {
     }
 
     @Nested
-    @DisplayName("getOcrPdfData")
-    class OcrData {
-
-        @Test
-        @DisplayName("returns an empty language list when the tessdata directory is absent")
-        void absentTessdataDirYieldsEmptyList() {
-            when(runtimePathConfig.getTessDataPath())
-                    .thenReturn(Path.of("nonexistent-tessdata-" + UUID.randomUUID()).toString());
-
-            ResponseEntity<UIDataController.OcrData> response =
-                    controller(userService).getOcrPdfData();
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            UIDataController.OcrData body = response.getBody();
-            assertNotNull(body);
-            assertNotNull(body.getLanguages());
-            assertTrue(body.getLanguages().isEmpty());
-        }
-
-        @Test
-        @DisplayName("lists trained languages, excludes osd, and sorts alphabetically")
-        void listsAndSortsTrainedLanguages(@TempDir Path dir) throws Exception {
-            Files.writeString(dir.resolve("eng.traineddata"), "x", StandardCharsets.UTF_8);
-            Files.writeString(dir.resolve("deu.traineddata"), "x", StandardCharsets.UTF_8);
-            Files.writeString(dir.resolve("osd.traineddata"), "x", StandardCharsets.UTF_8);
-            // Non-traineddata files must be ignored.
-            Files.writeString(dir.resolve("readme.txt"), "x", StandardCharsets.UTF_8);
-            when(runtimePathConfig.getTessDataPath()).thenReturn(dir.toString());
-
-            ResponseEntity<UIDataController.OcrData> response =
-                    controller(userService).getOcrPdfData();
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            UIDataController.OcrData body = response.getBody();
-            assertNotNull(body);
-            // osd filtered out; remaining sorted alphabetically.
-            assertEquals(List.of("deu", "eng"), body.getLanguages());
-        }
-
-        @Test
-        @DisplayName("excludes osd case-insensitively")
-        void excludesOsdCaseInsensitively(@TempDir Path dir) throws Exception {
-            Files.writeString(dir.resolve("OSD.traineddata"), "x", StandardCharsets.UTF_8);
-            Files.writeString(dir.resolve("fra.traineddata"), "x", StandardCharsets.UTF_8);
-            when(runtimePathConfig.getTessDataPath()).thenReturn(dir.toString());
-
-            ResponseEntity<UIDataController.OcrData> response =
-                    controller(userService).getOcrPdfData();
-
-            UIDataController.OcrData body = response.getBody();
-            assertNotNull(body);
-            assertEquals(List.of("fra"), body.getLanguages());
-            assertFalse(body.getLanguages().contains("OSD"));
-        }
-    }
-
-    @Nested
     @DisplayName("FontResource format mapping")
     class FontResourceMapping {
 

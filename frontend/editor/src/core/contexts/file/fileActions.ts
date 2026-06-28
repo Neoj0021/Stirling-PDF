@@ -23,6 +23,17 @@ import { FileAnalyzer } from "@app/services/fileAnalyzer";
 import { trackPdfUploaded } from "@app/services/analytics";
 const DEBUG = process.env.NODE_ENV === "development";
 const HYDRATION_CONCURRENCY = 2;
+
+type FilesConsumedCallback = (inputIds: string[], outputIds: string[]) => void;
+const _filesConsumedCallbacks = new Set<FilesConsumedCallback>();
+
+export function registerFilesConsumedCallback(fn: FilesConsumedCallback): void {
+  _filesConsumedCallbacks.add(fn);
+}
+
+export function unregisterFilesConsumedCallback(fn: FilesConsumedCallback): void {
+  _filesConsumedCallbacks.delete(fn);
+}
 let activeHydrations = 0;
 const hydrationQueue: Array<() => Promise<void>> = [];
 
@@ -614,8 +625,11 @@ export async function consumeFiles(
     console.log(
       `📄 consumeFiles: Successfully consumed files - removed ${inputFileIds.length} inputs, added ${outputStirlingFileStubs.length} outputs`,
     );
-  // Return the output file IDs for undo tracking
-  return outputStirlingFileStubs.map((stub) => stub.id);
+
+  const outputIds = outputStirlingFileStubs.map((stub) => stub.id);
+  _filesConsumedCallbacks.forEach((cb) => cb(inputFileIds, outputIds));
+
+  return outputIds;
 }
 
 /**

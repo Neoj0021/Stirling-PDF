@@ -33,6 +33,10 @@ interface SpaceTreeSectionProps {
   onSaveToCloud?: (fileId: FileId) => void;
   canSaveToCloud?: boolean;
   onVersionHistory?: (fileId: FileId) => void;
+  onRename?: (fileId: FileId, newName: string) => void;
+  /** Reports the currently checkbox-selected file IDs so the parent can offer
+   *  bulk actions (e.g. delete selected). */
+  onSelectionChange?: (selectedFileIds: string[]) => void;
   searchQuery: string;
 }
 
@@ -125,8 +129,11 @@ function SpaceRow({
       onDrop={(e) => {
         e.preventDefault();
         setDragOver(false);
-        const fileId = e.dataTransfer.getData(DRAG_FILE_TYPE);
-        if (fileId) onFileDrop(fileId);
+        const data = e.dataTransfer.getData(DRAG_FILE_TYPE);
+        data
+          .split(",")
+          .filter(Boolean)
+          .forEach((fileId) => onFileDrop(fileId));
       }}
     >
       {/* Chevron — only toggles collapse, does not activate space */}
@@ -246,8 +253,11 @@ function DefaultRow({
       onDrop={(e) => {
         e.preventDefault();
         setDragOver(false);
-        const fileId = e.dataTransfer.getData(DRAG_FILE_TYPE);
-        if (fileId) onFileDrop(fileId);
+        const data = e.dataTransfer.getData(DRAG_FILE_TYPE);
+        data
+          .split(",")
+          .filter(Boolean)
+          .forEach((fileId) => onFileDrop(fileId));
       }}
     >
       <button
@@ -284,6 +294,8 @@ export function SpaceTreeSection({
   onSaveToCloud,
   canSaveToCloud,
   onVersionHistory,
+  onRename,
+  onSelectionChange,
   searchQuery,
 }: SpaceTreeSectionProps) {
   const { t } = useTranslation();
@@ -333,18 +345,28 @@ export function SpaceTreeSection({
     });
   }, [workbenchFileIds]);
 
+  // Surface the current selection so the parent can offer bulk actions.
+  useEffect(() => {
+    onSelectionChange?.(Array.from(checkedFileIds));
+  }, [checkedFileIds, onSelectionChange]);
+
   const handleCheckboxClick = useCallback(
     (fileId: FileId) => {
       const id = fileId as string;
+      const willCheck = !checkedFileIds.has(id);
       setCheckedFileIds((prev) => {
         const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
+        if (willCheck) next.add(id);
+        else next.delete(id);
         return next;
       });
-      onToggleFile(fileId);
+      // Sync workbench membership to the new checked state. Toggling blindly let
+      // a file already in the workbench get removed on the first check, which the
+      // "leaves workbench → clear checkmark" effect then undid (needing a 2nd click).
+      const inWorkbench = workbenchFileIds.has(id);
+      if (willCheck !== inWorkbench) onToggleFile(fileId);
     },
-    [onToggleFile],
+    [checkedFileIds, workbenchFileIds, onToggleFile],
   );
 
   const filteredStubs = searchQuery.trim()
@@ -374,7 +396,13 @@ export function SpaceTreeSection({
           className={`space-tree-file-row${indent ? " indented" : ""}`}
           draggable
           onDragStart={(e) => {
-            e.dataTransfer.setData(DRAG_FILE_TYPE, id);
+            // If the dragged file is part of the checked selection, drag the
+            // whole selection so all checked files move to the drop target.
+            const ids =
+              checkedFileIds.has(id) && checkedFileIds.size > 1
+                ? Array.from(checkedFileIds)
+                : [id];
+            e.dataTransfer.setData(DRAG_FILE_TYPE, ids.join(","));
             e.dataTransfer.effectAllowed = "move";
           }}
         >
@@ -395,11 +423,12 @@ export function SpaceTreeSection({
             canSaveToCloud={canSaveToCloud}
             onVersionHistory={onVersionHistory}
             hasVersionHistory={(stub.versionNumber ?? 1) > 1}
+            onRename={onRename}
           />
         </div>
       );
     },
-    [checkedFileIds, workbenchFileIds, viewedWorkbenchId, onOpenFile, handleCheckboxClick, onEyeClick, onDelete, onSaveToCloud, canSaveToCloud, onVersionHistory],
+    [checkedFileIds, workbenchFileIds, viewedWorkbenchId, onOpenFile, handleCheckboxClick, onEyeClick, onDelete, onSaveToCloud, canSaveToCloud, onVersionHistory, onRename],
   );
 
   const renderFileList = (stubs: StirlingFileStub[], indent = false) => {

@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollArea } from "@mantine/core";
+import { Center, ScrollArea, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import FileListItem from "@app/components/fileManager/FileListItem";
 import FileHistoryGroup from "@app/components/fileManager/FileHistoryGroup";

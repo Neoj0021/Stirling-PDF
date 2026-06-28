@@ -36,7 +36,6 @@ const TOOL_IDS = [
   "split",
   "merge",
   "convert",
-  "ocr",
   "addImage",
   "rotate",
   "annotate",
