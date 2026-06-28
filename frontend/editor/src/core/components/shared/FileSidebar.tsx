@@ -304,6 +304,7 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
     const [selectedSpaceFileIds, setSelectedSpaceFileIds] = useState<string[]>(
       [],
     );
+    const clearSpaceSelectionRef = useRef<(() => void) | null>(null);
 
     const handleBulkDelete = useCallback(async () => {
       if (selectedSpaceFileIds.length === 0) return;
@@ -1047,6 +1048,7 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
                 }
                 onRename={isWatchedFoldersActive ? undefined : handleRename}
                 onSelectionChange={setSelectedSpaceFileIds}
+                clearSelectionRef={clearSpaceSelectionRef}
                 searchQuery={searchQuery}
               />
             )}
@@ -1076,6 +1078,20 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmSidebarDelete}
         />
+
+        {/* Uncheck-all — clears the current checkbox selection. */}
+        {!collapsed && selectedSpaceFileIds.length >= 1 && (
+          <button
+            type="button"
+            className="file-sidebar-uncheck-all"
+            onClick={() => clearSpaceSelectionRef.current?.()}
+          >
+            <CloseIcon sx={{ fontSize: "1rem" }} />
+            <span className="sidebar-content-fade">
+              {t("fileSidebar.uncheckAll", "Uncheck all")}
+            </span>
+          </button>
+        )}
 
         {/* Bulk-delete bar — shown above the settings bar when one or more files
             are checkbox-selected in the Spaces tree. */}

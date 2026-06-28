@@ -45,7 +45,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   autoUnzipFileLimit: 4,
   defaultToolPanelMode: DEFAULT_TOOL_PANEL_MODE,
   defaultStartupView: "tools",
-  defaultViewerZoom: "auto",
+  defaultViewerZoom: "100",
   theme: "system",
   toolPanelModePromptSeen: false,
   hasSelectedToolPanelMode: false,

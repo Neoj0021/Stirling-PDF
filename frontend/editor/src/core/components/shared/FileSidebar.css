@@ -446,6 +446,34 @@
   outline-offset: -2px;
 }
 
+/* Uncheck-all action, shown just above the bulk-delete bar. */
+.file-sidebar-uncheck-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 16px);
+  margin: 4px 8px 0 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: var(--hover-bg, rgba(127, 127, 127, 0.1));
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.12s ease;
+}
+
+.file-sidebar-uncheck-all:hover {
+  background: var(--hover-bg-strong, rgba(127, 127, 127, 0.18));
+}
+
+.file-sidebar-uncheck-all:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
 /* Bottom bar settings icon tracks the right edge during collapse animation */
 
 .file-sidebar-bottom-avatar {

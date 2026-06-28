@@ -124,8 +124,7 @@ const Redact = (props: BaseToolProps) => {
     }
     return (
       !base.params.validateParameters() ||
-      !base.hasFiles ||
-      !base.endpointEnabled
+      !base.hasFiles
     );
   };
 

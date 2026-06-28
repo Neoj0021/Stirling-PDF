@@ -370,7 +370,6 @@ const EditTableOfContents = (props: BaseToolProps) => {
       isExecuteDisabled:
         !selectedFile ||
         !base.hasFiles ||
-        base.endpointEnabled === false ||
         base.operation.isLoading ||
         base.endpointLoading,
       isExecuting: base.operation.isLoading,

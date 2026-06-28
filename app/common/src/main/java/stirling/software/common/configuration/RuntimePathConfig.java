@@ -93,7 +93,7 @@ public class RuntimePathConfig {
         String defaultUnoConvertPath = isDocker ? "/usr/local/bin/unoconvert" : "unoconvert";
         String defaultCalibrePath = isDocker ? "/opt/calibre/ebook-convert" : "ebook-convert";
         String defaultOcrMyPdfPath = isDocker ? "/opt/venv/bin/ocrmypdf" : "ocrmypdf";
-        String defaultSOfficePath = isDocker ? "/usr/bin/soffice" : "soffice";
+        String defaultSOfficePath = isDocker ? "/usr/bin/soffice" : resolveDefaultSOfficePath();
 
         Operations operations = customPaths.getOperations();
         this.weasyPrintPath =
@@ -141,6 +141,32 @@ public class RuntimePathConfig {
 
     private String resolvePath(String defaultPath, String customPath) {
         return StringUtils.isNotBlank(customPath) ? customPath : defaultPath;
+    }
+
+    /**
+     * On Windows, LibreOffice doesn't add itself to PATH, so a bare {@code soffice} command fails
+     * even when it's installed. Probe the standard install locations and fall back to {@code
+     * soffice} (PATH) if none are found.
+     */
+    private String resolveDefaultSOfficePath() {
+        boolean isWindows =
+                java.lang.System.getProperty("os.name", "")
+                        .toLowerCase(java.util.Locale.ROOT)
+                        .contains("windows");
+        if (!isWindows) {
+            return "soffice";
+        }
+        List<String> candidates =
+                List.of(
+                        "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+                        "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe");
+        for (String candidate : candidates) {
+            if (Files.exists(Path.of(candidate))) {
+                log.info("Detected LibreOffice at {}", candidate);
+                return candidate;
+            }
+        }
+        return "soffice";
     }
 
     private List<String> resolveWatchedFolderPaths(

@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { ActionIcon, Slider, Popover, Select } from "@mantine/core";
+import { ActionIcon, Popover } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import { supportedLanguages } from "@app/i18n";
 import { useViewer } from "@app/contexts/ViewerContext";
 import {
   useWorkbenchBarButtons,
@@ -21,17 +20,15 @@ import {
 import { stripBasePath, withBasePath } from "@app/constants/app";
 import { useRedaction, useRedactionMode } from "@app/contexts/RedactionContext";
 import TextFieldsIcon from "@mui/icons-material/TextFields";
+import TitleIcon from "@mui/icons-material/Title";
 import StraightenIcon from "@mui/icons-material/Straighten";
 import LayersIcon from "@mui/icons-material/Layers";
-import VolumeUpIcon from "@mui/icons-material/VolumeUp";
-import StopIcon from "@mui/icons-material/Stop";
-import { useViewerReadAloud } from "@app/components/viewer/useViewerReadAloud";
 
 export function useViewerWorkbenchBarButtons(
   isRulerActive?: boolean,
   setIsRulerActive?: (v: boolean) => void,
 ) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const viewer = useViewer();
   const {
     isThumbnailSidebarVisible,
@@ -56,16 +53,6 @@ export function useViewerWorkbenchBarButtons(
   const { requestNavigation } = useNavigationGuard();
   const { redactionsApplied, activeType: redactionActiveType } = useRedaction();
   const { pendingCount } = useRedactionMode();
-  const {
-    isReadingAloud,
-    speechRate,
-    speechLanguage,
-    speechVoice,
-    supportedLanguageCodes,
-    handleReadAloud,
-    handleSpeechRateChange,
-    handleSpeechLanguageChange,
-  } = useViewerReadAloud(i18n.language || "en-US");
 
   useEffect(() => {
     return registerImmediatePanUpdate((newIsPanning) => {
@@ -117,30 +104,10 @@ export function useViewerWorkbenchBarButtons(
   const annotationsLabel = t("workbenchBar.annotations", "Annotations");
   const formFillLabel = t("workbenchBar.formFill", "Fill Form");
   const rulerLabel = t("workbenchBar.ruler", "Ruler / Measure");
-  const readAloudLabel = t("workbenchBar.readAloud", "Read Aloud");
-  const readAloudSpeedLabel = t("workbenchBar.readAloudSpeed", "Speed");
 
   const isFormFillActive = (selectedTool as string) === "formFill";
-
-  // Filter languages based on available voices
-  const filteredLanguages = useMemo(
-    () =>
-      Object.entries(supportedLanguages)
-        .filter(
-          ([code]) =>
-            supportedLanguageCodes.size === 0 ||
-            supportedLanguageCodes.has(code) ||
-            supportedLanguageCodes.has(code.split("-")[0]),
-        )
-        .map(([code, label]) => ({
-          value: code,
-          label: label,
-        })),
-    [supportedLanguageCodes],
-  );
-
-  const shouldShowLanguageSelector =
-    supportedLanguageCodes.size === 0 || filteredLanguages.length > 1;
+  const isTextBoxActive = (selectedTool as string) === "addText";
+  const textBoxLabel = t("workbenchBar.textBox", "Text Box");
 
   const viewerButtons = useMemo<WorkbenchBarButtonWithAction[]>(() => {
     const buttons: WorkbenchBarButtonWithAction[] = [
@@ -337,105 +304,6 @@ export function useViewerWorkbenchBarButtons(
         },
       },
       {
-        id: "viewer-read-aloud",
-        tooltip: readAloudLabel,
-        ariaLabel: readAloudLabel,
-        section: "top" as const,
-        order: 57,
-        active: isReadingAloud,
-        render: ({ disabled }) => (
-          <Popover
-            position={tooltipPosition}
-            withArrow
-            shadow="md"
-            offset={8}
-            opened={isReadingAloud}
-            onClose={() => {}}
-            withinPortal
-          >
-            <Popover.Target>
-              <div style={{ display: "inline-flex" }}>
-                <Tooltip
-                  content={readAloudLabel}
-                  position={tooltipPosition}
-                  offset={12}
-                  arrow
-                  portalTarget={document.body}
-                >
-                  <ActionIcon
-                    variant={isReadingAloud ? "filled" : "subtle"}
-                    radius="md"
-                    className="workbench-bar-action-icon"
-                    disabled={
-                      disabled ||
-                      typeof window === "undefined" ||
-                      !window.speechSynthesis
-                    }
-                    aria-label={readAloudLabel}
-                    onClick={handleReadAloud}
-                    color={isReadingAloud ? "blue" : undefined}
-                  >
-                    {isReadingAloud ? (
-                      <StopIcon sx={{ fontSize: "1.25rem" }} />
-                    ) : (
-                      <VolumeUpIcon sx={{ fontSize: "1.25rem" }} />
-                    )}
-                  </ActionIcon>
-                </Tooltip>
-              </div>
-            </Popover.Target>
-            <Popover.Dropdown>
-              <div style={{ width: "16rem", padding: "0.5rem" }}>
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    marginBottom: "0.5rem",
-                    textAlign: "center",
-                  }}
-                >
-                  {readAloudSpeedLabel}: {speechRate.toFixed(1)}x
-                </div>
-                <Slider
-                  value={speechRate}
-                  onChange={handleSpeechRateChange}
-                  min={0.5}
-                  max={2}
-                  step={0.1}
-                  marks={[
-                    { value: 0.5, label: "0.5x" },
-                    { value: 1, label: "1x" },
-                    { value: 2, label: "2x" },
-                  ]}
-                  styles={{
-                    markLabel: { fontSize: "0.6rem" },
-                  }}
-                  mb="md"
-                />
-                {shouldShowLanguageSelector && (
-                  <Select
-                    label={t("workbenchBar.readAloudLanguage", "Language")}
-                    placeholder={t(
-                      "workbenchBar.selectLanguage",
-                      "Select language",
-                    )}
-                    value={speechLanguage}
-                    onChange={(value) => {
-                      if (value) {
-                        handleSpeechLanguageChange(value);
-                      }
-                    }}
-                    data={filteredLanguages}
-                    size="xs"
-                    searchable
-                    mb="sm"
-                  />
-                )}
-              </div>
-            </Popover.Dropdown>
-          </Popover>
-        ),
-      },
-      {
         id: "viewer-annotations",
         tooltip: annotationsLabel,
         ariaLabel: annotationsLabel,
@@ -495,6 +363,42 @@ export function useViewerWorkbenchBarButtons(
         ),
       },
       {
+        id: "viewer-text-box",
+        tooltip: textBoxLabel,
+        ariaLabel: textBoxLabel,
+        section: "top" as const,
+        order: 61,
+        active: isTextBoxActive,
+        render: ({ disabled }) => (
+          <Tooltip
+            content={textBoxLabel}
+            position={tooltipPosition}
+            offset={12}
+            arrow
+            portalTarget={document.body}
+          >
+            <ActionIcon
+              variant={isTextBoxActive ? "filled" : "subtle"}
+              radius="md"
+              className="workbench-bar-action-icon"
+              onClick={() => {
+                if (disabled) return;
+                if (isTextBoxActive) {
+                  handleBackToTools();
+                } else {
+                  handleToolSelect("addText" as any);
+                }
+              }}
+              disabled={disabled}
+              aria-pressed={isTextBoxActive}
+              color={isTextBoxActive ? "blue" : undefined}
+            >
+              <TitleIcon sx={{ fontSize: "1.25rem" }} />
+            </ActionIcon>
+          </Tooltip>
+        ),
+      },
+      {
         id: "viewer-form-fill",
         tooltip: formFillLabel,
         ariaLabel: formFillLabel,
@@ -534,7 +438,6 @@ export function useViewerWorkbenchBarButtons(
     return buttons;
   }, [
     t,
-    i18n.language,
     viewer,
     isThumbnailSidebarVisible,
     isBookmarkSidebarVisible,
@@ -560,21 +463,12 @@ export function useViewerWorkbenchBarButtons(
     redactionActiveType,
     formFillLabel,
     isFormFillActive,
+    textBoxLabel,
+    isTextBoxActive,
+    handleBackToTools,
     rulerLabel,
     isRulerActive,
     setIsRulerActive,
-    readAloudLabel,
-    readAloudSpeedLabel,
-    isReadingAloud,
-    speechRate,
-    speechLanguage,
-    speechVoice,
-    supportedLanguageCodes,
-    filteredLanguages,
-    shouldShowLanguageSelector,
-    handleReadAloud,
-    handleSpeechRateChange,
-    handleSpeechLanguageChange,
   ]);
 
   useWorkbenchBarButtons(viewerButtons);

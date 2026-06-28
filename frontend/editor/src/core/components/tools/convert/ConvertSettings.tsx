@@ -83,19 +83,10 @@ const ConvertSettings = ({
   const conversionStatus = useConversionCloudStatus();
 
   const isConversionAvailable = (fromExt: string, toExt: string): boolean => {
-    const conversionKey = `${fromExt}-${toExt}`;
-
-    // In desktop SaaS mode, check combined availability (local OR SaaS)
-    if (conversionStatus.availability[conversionKey] !== undefined) {
-      return conversionStatus.availability[conversionKey];
-    }
-
-    // Fallback to local-only check (web mode or desktop non-SaaS mode)
-    const endpointKey = EXTENSION_TO_ENDPOINT[fromExt]?.[toExt];
-    if (!endpointKey) return false;
-
-    const isAvailable = endpointStatus[endpointKey] === true;
-    return isAvailable;
+    // Every defined conversion is offered by default (no sign-in / availability
+    // lock). Conversions needing an external backend tool (e.g. LibreOffice for
+    // Office formats) simply error at run time if that tool isn't installed.
+    return !!EXTENSION_TO_ENDPOINT[fromExt]?.[toExt];
   };
 
   const doesConversionUseCloud = (fromExt: string, toExt: string): boolean => {

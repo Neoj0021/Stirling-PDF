@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Menu, Tooltip } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import AddIcon from "@mui/icons-material/Add";
@@ -37,6 +43,9 @@ interface SpaceTreeSectionProps {
   /** Reports the currently checkbox-selected file IDs so the parent can offer
    *  bulk actions (e.g. delete selected). */
   onSelectionChange?: (selectedFileIds: string[]) => void;
+  /** Receives a callback that clears the current checkbox selection, so the
+   *  parent can offer an "uncheck all" action. */
+  clearSelectionRef?: MutableRefObject<(() => void) | null>;
   searchQuery: string;
 }
 
@@ -94,7 +103,7 @@ function SpaceRow({
   onRename: (name: string) => void;
   onDelete: () => void;
   onColorChange: (color: string) => void;
-  onFileDrop: (fileId: string) => void;
+  onFileDrop: (fileIds: string[]) => void;
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -130,10 +139,8 @@ function SpaceRow({
         e.preventDefault();
         setDragOver(false);
         const data = e.dataTransfer.getData(DRAG_FILE_TYPE);
-        data
-          .split(",")
-          .filter(Boolean)
-          .forEach((fileId) => onFileDrop(fileId));
+        const ids = data.split(",").filter(Boolean);
+        if (ids.length) onFileDrop(ids);
       }}
     >
       {/* Chevron — only toggles collapse, does not activate space */}
@@ -228,7 +235,7 @@ function DefaultRow({
   fileCount: number;
   onActivate: () => void;
   onToggle: () => void;
-  onFileDrop: (fileId: string) => void;
+  onFileDrop: (fileIds: string[]) => void;
 }) {
   const { t } = useTranslation();
   const [dragOver, setDragOver] = useState(false);
@@ -254,10 +261,8 @@ function DefaultRow({
         e.preventDefault();
         setDragOver(false);
         const data = e.dataTransfer.getData(DRAG_FILE_TYPE);
-        data
-          .split(",")
-          .filter(Boolean)
-          .forEach((fileId) => onFileDrop(fileId));
+        const ids = data.split(",").filter(Boolean);
+        if (ids.length) onFileDrop(ids);
       }}
     >
       <button
@@ -296,6 +301,7 @@ export function SpaceTreeSection({
   onVersionHistory,
   onRename,
   onSelectionChange,
+  clearSelectionRef,
   searchQuery,
 }: SpaceTreeSectionProps) {
   const { t } = useTranslation();
@@ -333,26 +339,81 @@ export function SpaceTreeSection({
   // opening a file by clicking the row never triggers a checkmark.
   const [checkedFileIds, setCheckedFileIds] = useState<Set<string>>(new Set());
 
-  // When files leave the workbench externally (tab close, delete, etc.), clear their checkmarks.
+  // Anchor for shift-click range selection, and the flat list of currently
+  // visible file IDs (in render order) the range is computed against.
+  const anchorIdRef = useRef<string | null>(null);
+  const orderedVisibleIdsRef = useRef<string[]>([]);
+
+  // Clear checkmarks only for files that no longer exist (deleted). Keying this
+  // off the actual file list — not workbench membership — avoids a race where a
+  // range selection that adds files to the workbench gets its last item stripped
+  // before that file's workbench update lands.
   useEffect(() => {
+    const valid = new Set(allFileStubs.map((s) => s.id as string));
     setCheckedFileIds((prev) => {
       const next = new Set(prev);
       let changed = false;
       for (const id of prev) {
-        if (!workbenchFileIds.has(id)) { next.delete(id); changed = true; }
+        if (!valid.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
       }
       return changed ? next : prev;
     });
-  }, [workbenchFileIds]);
+  }, [allFileStubs]);
 
   // Surface the current selection so the parent can offer bulk actions.
   useEffect(() => {
     onSelectionChange?.(Array.from(checkedFileIds));
   }, [checkedFileIds, onSelectionChange]);
 
+  // Clear all checkmarks (exposed to the parent for an "uncheck all" action).
+  const clearSelection = useCallback(() => {
+    setCheckedFileIds(new Set());
+    anchorIdRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!clearSelectionRef) return;
+    clearSelectionRef.current = clearSelection;
+    return () => {
+      clearSelectionRef.current = null;
+    };
+  }, [clearSelectionRef, clearSelection]);
+
+  // Ensure a file is checked and present in the workbench (used by range select).
+  const ensureChecked = useCallback(
+    (ids: string[]) => {
+      setCheckedFileIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        return next;
+      });
+      ids.forEach((id) => {
+        if (!workbenchFileIds.has(id)) onToggleFile(id as FileId);
+      });
+    },
+    [workbenchFileIds, onToggleFile],
+  );
+
   const handleCheckboxClick = useCallback(
-    (fileId: FileId) => {
+    (fileId: FileId, e: React.MouseEvent) => {
       const id = fileId as string;
+
+      // Shift-click selects the contiguous range from the anchor to this file.
+      if (e.shiftKey && anchorIdRef.current && anchorIdRef.current !== id) {
+        const ordered = orderedVisibleIdsRef.current;
+        const from = ordered.indexOf(anchorIdRef.current);
+        const to = ordered.indexOf(id);
+        if (from !== -1 && to !== -1) {
+          const [lo, hi] = from <= to ? [from, to] : [to, from];
+          ensureChecked(ordered.slice(lo, hi + 1));
+          anchorIdRef.current = id;
+          return;
+        }
+      }
+
       const willCheck = !checkedFileIds.has(id);
       setCheckedFileIds((prev) => {
         const next = new Set(prev);
@@ -365,8 +426,25 @@ export function SpaceTreeSection({
       // "leaves workbench → clear checkmark" effect then undid (needing a 2nd click).
       const inWorkbench = workbenchFileIds.has(id);
       if (willCheck !== inWorkbench) onToggleFile(fileId);
+      anchorIdRef.current = id;
     },
-    [checkedFileIds, workbenchFileIds, onToggleFile],
+    [checkedFileIds, workbenchFileIds, onToggleFile, ensureChecked],
+  );
+
+  // Move dragged files into a space (or Default), then auto-uncheck the moved
+  // files (leaving any unrelated checkmarks intact).
+  const moveFilesToSpace = useCallback(
+    (fileIds: string[], spaceId: string | null) => {
+      fileIds.forEach((fid) => assignFileToSpace(fid, spaceId));
+      setCheckedFileIds((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set(prev);
+        fileIds.forEach((fid) => next.delete(fid));
+        return next;
+      });
+      anchorIdRef.current = null;
+    },
+    [assignFileToSpace],
   );
 
   const filteredStubs = searchQuery.trim()
@@ -381,6 +459,20 @@ export function SpaceTreeSection({
   const unassignedFiles = filteredStubs.filter(
     (s) => !fileSpaceMap[s.id as string],
   );
+
+  // Flat list of visible file IDs in render order (Default first, then each
+  // expanded space) — the basis for shift-click range selection.
+  const visibleSpaces = spaces.filter(
+    (s) => !filterColor || s.color === filterColor,
+  );
+  orderedVisibleIdsRef.current = [
+    ...(defaultCollapsed ? [] : unassignedFiles.map((s) => s.id as string)),
+    ...visibleSpaces.flatMap((space) =>
+      collapsedSpaceIds.has(space.id)
+        ? []
+        : filesBySpace(space.id).map((s) => s.id as string),
+    ),
+  ];
 
   /** Render a single draggable file row — no checkbox, click to open in viewer. */
   const renderFile = useCallback(
@@ -415,7 +507,12 @@ export function SpaceTreeSection({
             isActive={isViewedInViewer}
             isViewedInViewer={isViewedInViewer}
             thumbnailUrl={thumbnailUrl}
-            onClick={() => onOpenFile(stub)}
+            onClick={() => {
+              // Opening a file also sets the range-selection anchor, so a
+              // subsequent shift-click selects from here.
+              anchorIdRef.current = stub.id as string;
+              onOpenFile(stub);
+            }}
             onCheckboxClick={handleCheckboxClick}
             onEyeClick={onEyeClick}
             onDelete={onDelete}
@@ -515,7 +612,7 @@ export function SpaceTreeSection({
             onOpenSpaceFiles(unassignedFiles);
           }}
           onToggle={toggleDefaultCollapsed}
-          onFileDrop={(fileId) => assignFileToSpace(fileId, null)}
+          onFileDrop={(fileIds) => moveFilesToSpace(fileIds, null)}
         />
         {!defaultCollapsed && unassignedFiles.length > 0 && (
           <div className="space-tree-space-files">
@@ -544,7 +641,7 @@ export function SpaceTreeSection({
                 onRename={(name) => renameSpace(space.id, name)}
                 onDelete={() => deleteSpace(space.id)}
                 onColorChange={(color) => changeSpaceColor(space.id, color)}
-                onFileDrop={(fileId) => assignFileToSpace(fileId, space.id)}
+                onFileDrop={(fileIds) => moveFilesToSpace(fileIds, space.id)}
               />
               {!isCollapsed && (
                 <div className="space-tree-space-files">

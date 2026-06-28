@@ -37,8 +37,9 @@ This fork contains the following changes on top of upstream Stirling PDF:
 - **Checkbox (icon area only)** toggles workbench membership without opening the file. A checkmark appears only when you explicitly check a file this way.
 - **Space color** — pick a color from the kebab menu (⋮) on any space. Color-filter dots appear beside the SPACES header when ≥ 2 distinct colors are in use; click a dot to filter the list.
 - **Drag-and-drop OS files** onto the workbench area (while a PDF is already open) to add new files directly.
-- **Multi-select drag** — check multiple files (icon area) and drag any one of them onto a space to move the whole selection together.
-- **Bulk delete** — when one or more files are checked, a "Delete N items" button appears above the settings bar to remove them all at once.
+- **Multi-select** — check files via the icon area, or **shift-click** a row to select a contiguous range, or **Ctrl/Cmd-click** rows to toggle individual files.
+- **Multi-select drag** — drag any checked file onto a space to move the whole selection together; the moved files auto-uncheck on drop.
+- **Bulk actions** — when one or more files are checked, an **Uncheck all** button and a **Delete N items** button appear above the settings bar.
 - **Rename in place** — double-click a file's name in the sidebar to rename it inline.
 - **Output stays in its space** — editing/processing a file keeps the result in the same space instead of dropping it into Default.
 
@@ -46,9 +47,19 @@ This fork contains the following changes on top of upstream Stirling PDF:
 
 A tab bar appears above the workbench showing one tab per open file. Tabs filter to the active space. Clicking × on a tab removes that file from the workbench.
 
+### PDF Viewer / Reader
+
+- **Default zoom is 100%** when opening a PDF (configurable in Settings → General → "Default reader zoom").
+- **Auto-hiding bottom toolbar** — the page-navigation/zoom bar sits clear of the horizontal scrollbar, hides while scrolling, and reappears when the cursor moves into the bottom quarter of the page.
+- **Toolbar tools** — added a **Text Box** button; removed **Read Aloud** and **Redact** from the viewer toolbar.
+
 ### PDF Text Editor — Install Missing Fonts
 
 When a PDF uses a font that isn't embedded, the **Fonts on this page** panel flags it as MISSING. A **Download & install font** button fetches the matching family from Google Fonts and installs it permanently on the server (`customFiles/static/fonts/`), so it survives reloads and is shared across sessions. The font is verified by actually measuring that its glyphs render before the badge flips to PERFECT, and the editor canvas re-renders the text in the real font automatically — no manual reload. Text colour is preserved from the original PDF.
+
+### All Tools Unlocked (No Sign-In Lock)
+
+Every tool is enabled by default — there is no "sign in to unlock" gate. Tools that rely on an external backend program still need it installed: for example **Office conversions (.docx → .pdf, etc.) require LibreOffice**. On Windows the backend auto-detects LibreOffice at its standard install location (`C:\Program Files\LibreOffice\program\soffice.exe`), so installing it is enough — no PATH setup.
 
 ### Sign Tool — Saved Signatures
 

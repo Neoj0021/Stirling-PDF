@@ -172,8 +172,9 @@ export interface FileItemProps {
   onVersionHistory?: (fileId: FileId) => void;
   /** Whether this file has more than one version (drives the menu item). */
   hasVersionHistory?: boolean;
-  /** Called when the user clicks the checkbox icon specifically (not the full row). */
-  onCheckboxClick?: (fileId: FileId) => void;
+  /** Called when the user clicks the checkbox icon specifically (not the full row).
+   *  Receives the mouse event so callers can detect modifier keys (e.g. shift). */
+  onCheckboxClick?: (fileId: FileId, e: React.MouseEvent) => void;
   /** Called when the user renames the file by double-clicking the filename. */
   onRename?: (fileId: FileId, newName: string) => void;
 }
@@ -257,7 +258,16 @@ export function FileItem({
               } as React.CSSProperties)
             : undefined
         }
-        onClick={() => onClick(fileId)}
+        onClick={(e) => {
+          // Shift / Ctrl / Cmd-click anywhere on the row selects (and drives
+          // range selection) instead of opening the file — like a file manager.
+          if ((e.shiftKey || e.ctrlKey || e.metaKey) && onCheckboxClick) {
+            e.preventDefault();
+            onCheckboxClick(fileId, e);
+          } else {
+            onClick(fileId);
+          }
+        }}
         draggable={draggable}
         onDragStart={
           draggable && onDragStart ? (e) => onDragStart(e, fileId) : undefined
@@ -272,7 +282,7 @@ export function FileItem({
           className="file-sidebar-file-icon-wrapper"
           onClick={
             onCheckboxClick
-              ? (e) => { e.stopPropagation(); onCheckboxClick(fileId); }
+              ? (e) => { e.stopPropagation(); onCheckboxClick(fileId, e); }
               : undefined
           }
           role={onCheckboxClick ? "checkbox" : undefined}
