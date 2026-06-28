@@ -459,6 +459,19 @@ const extractColor = (element: PdfJsonTextElement): string | null => {
   return null;
 };
 
+/**
+ * Resolve a group's text color from the first element that actually carries one,
+ * so a leading run without an explicit fillColor doesn't drop the whole group to
+ * the default gray.
+ */
+const extractGroupColor = (elements: PdfJsonTextElement[]): string | null => {
+  for (const element of elements) {
+    const color = extractColor(element);
+    if (color) return color;
+  }
+  return null;
+};
+
 const RAD_TO_DEG = 180 / Math.PI;
 
 const normalizeAngle = (angle: number): number => {
@@ -571,7 +584,7 @@ const createGroup = (
     fontId: firstElement?.fontId,
     fontSize: firstElement?.fontSize,
     fontMatrixSize: firstElement?.fontMatrixSize,
-    color: firstElement ? extractColor(firstElement) : null,
+    color: extractGroupColor(elements),
     fontWeight: null, // Will be determined from font descriptor
     rotation,
     anchor,
@@ -817,7 +830,7 @@ const groupLinesIntoParagraphs = (
       fontMatrixSize: firstElement?.fontMatrixSize,
       lineSpacing: averageSpacing,
       lineElementCounts: lines.length > 1 ? lineElementCounts : null,
-      color: firstElement ? extractColor(firstElement) : null,
+      color: extractGroupColor(allElements),
       fontWeight: null,
       rotation,
       anchor,

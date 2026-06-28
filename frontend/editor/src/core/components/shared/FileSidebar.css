@@ -417,6 +417,35 @@
   min-height: 48px;
 }
 
+/* Bulk-delete action shown above the settings bar when multiple files are
+   selected in the Spaces tree. */
+.file-sidebar-bulk-delete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 16px);
+  margin: 4px 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--mantine-color-red-6, #ef4444);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.12s ease;
+}
+
+.file-sidebar-bulk-delete:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.file-sidebar-bulk-delete:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: -2px;
+}
+
 /* Bottom bar settings icon tracks the right edge during collapse animation */
 
 .file-sidebar-bottom-avatar {

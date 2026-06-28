@@ -140,6 +140,20 @@
   text-overflow: ellipsis;
 }
 
+.file-sidebar-file-rename-input {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--surface-secondary, rgba(0,0,0,0.08));
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  padding: 1px 4px;
+  outline: none;
+  min-width: 0;
+}
+
 .file-sidebar-file-item.selected .file-sidebar-file-name {
   color: #3b82f6;
 }

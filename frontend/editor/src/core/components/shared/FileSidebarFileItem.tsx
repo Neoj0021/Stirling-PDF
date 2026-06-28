@@ -174,6 +174,8 @@ export interface FileItemProps {
   hasVersionHistory?: boolean;
   /** Called when the user clicks the checkbox icon specifically (not the full row). */
   onCheckboxClick?: (fileId: FileId) => void;
+  /** Called when the user renames the file by double-clicking the filename. */
+  onRename?: (fileId: FileId, newName: string) => void;
 }
 
 const MAX_VISIBLE_FOLDER_TAGS = 2;
@@ -202,9 +204,12 @@ export function FileItem({
   onVersionHistory,
   hasVersionHistory = false,
   onCheckboxClick,
+  onRename,
 }: FileItemProps) {
   const { t } = useTranslation();
   const ext = getFileExtension(name);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(name);
   const dateLabel = lastModified ? formatFileDate(lastModified) : "";
   const typeLabel = ext ? ext.toUpperCase() : "File";
 
@@ -285,11 +290,44 @@ export function FileItem({
           )}
         </div>
         <div className="file-sidebar-file-info">
-          <span
-            className={`file-sidebar-file-name${isSelected ? " selected" : ""}`}
-          >
-            {name}
-          </span>
+          {isRenaming ? (
+            <input
+              className="file-sidebar-file-rename-input"
+              value={renameValue}
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={() => {
+                const trimmed = renameValue.trim();
+                if (trimmed && trimmed !== name) onRename?.(fileId, trimmed);
+                setIsRenaming(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                } else if (e.key === "Escape") {
+                  setRenameValue(name);
+                  setIsRenaming(false);
+                }
+                e.stopPropagation();
+              }}
+            />
+          ) : (
+            <span
+              className={`file-sidebar-file-name${isSelected ? " selected" : ""}`}
+              onDoubleClick={
+                onRename
+                  ? (e) => {
+                      e.stopPropagation();
+                      setRenameValue(name);
+                      setIsRenaming(true);
+                    }
+                  : undefined
+              }
+            >
+              {name}
+            </span>
+          )}
           <span className="file-sidebar-file-meta-row">
             <span className="file-sidebar-file-meta">
               {dateLabel}

@@ -38,6 +38,30 @@ export interface DocumentFontAnalysis {
   };
 }
 
+// Weight/style tokens that aren't part of a font family name.
+const FONT_VARIANT_TOKENS = new Set([
+  "thin", "extralight", "ultralight", "light", "regular", "normal", "book",
+  "medium", "semibold", "demibold", "demi", "bold", "extrabold", "ultrabold",
+  "black", "heavy", "italic", "oblique", "bolditalic", "lightitalic",
+  "mediumitalic", "semibolditalic", "condensed", "expanded",
+]);
+
+/**
+ * Reduce a font name to a normalized family key for matching against installed
+ * user fonts. "ABCDEF+Lato-Bold" → "lato", "OpenSans-Italic" → "opensans".
+ * Shared so the analysis and the install/render paths agree on identity.
+ */
+export const normalizeFontFamilyKey = (
+  name: string | null | undefined,
+): string => {
+  const stripped = (name ?? "").replace(/^[A-Z]{6}\+/, "");
+  const parts = stripped.split(/[-_\s]+/).filter(Boolean);
+  const kept = parts.filter(
+    (p, i) => i === 0 || !FONT_VARIANT_TOKENS.has(p.toLowerCase()),
+  );
+  return kept.join("").toLowerCase().replace(/[^a-z0-9]/g, "");
+};
+
 /**
  * Determines if a font name indicates it's a subset font.
  * Subset fonts typically have a 6-character prefix like "ABCDEE+"
@@ -147,6 +171,7 @@ const extractBaseFontName = (
 export const analyzeFontReproduction = (
   font: PdfJsonFont,
   allFonts?: PdfJsonFont[],
+  usableFamilyKeys?: Set<string>,
 ): FontAnalysis => {
   const fontId = font.id || font.uid || "unknown";
   const baseName = font.baseName || "Unknown Font";
@@ -289,6 +314,20 @@ export const analyzeFontReproduction = (
     }
   }
 
+  // A missing font that the user has installed locally (verified to actually
+  // render) is perfect for editing — promote it through the normal status.
+  if (
+    status === "missing" &&
+    usableFamilyKeys?.has(normalizeFontFamilyKey(font.baseName))
+  ) {
+    status = "perfect";
+    warnings.length = 0;
+    suggestions.length = 0;
+    suggestions.push(
+      "This font is installed locally and renders correctly while editing.",
+    );
+  }
+
   return {
     fontId,
     baseName,
@@ -391,6 +430,7 @@ export const getFontsForPage = (
 export const analyzeDocumentFonts = (
   document: PdfJsonDocument | null,
   pageIndex?: number,
+  usableFamilyKeys?: Set<string>,
 ): DocumentFontAnalysis => {
   if (!document?.fonts || document.fonts.length === 0) {
     return {
@@ -431,7 +471,7 @@ export const analyzeDocumentFonts = (
   }
 
   const fontAnalyses = fontsToAnalyze.map((font) =>
-    analyzeFontReproduction(font, allFonts),
+    analyzeFontReproduction(font, allFonts, usableFamilyKeys),
   );
 
   // Calculate summary

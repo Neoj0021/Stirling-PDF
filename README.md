@@ -37,10 +37,18 @@ This fork contains the following changes on top of upstream Stirling PDF:
 - **Checkbox (icon area only)** toggles workbench membership without opening the file. A checkmark appears only when you explicitly check a file this way.
 - **Space color** — pick a color from the kebab menu (⋮) on any space. Color-filter dots appear beside the SPACES header when ≥ 2 distinct colors are in use; click a dot to filter the list.
 - **Drag-and-drop OS files** onto the workbench area (while a PDF is already open) to add new files directly.
+- **Multi-select drag** — check multiple files (icon area) and drag any one of them onto a space to move the whole selection together.
+- **Bulk delete** — when one or more files are checked, a "Delete N items" button appears above the settings bar to remove them all at once.
+- **Rename in place** — double-click a file's name in the sidebar to rename it inline.
+- **Output stays in its space** — editing/processing a file keeps the result in the same space instead of dropping it into Default.
 
 ### Document Tab Bar
 
 A tab bar appears above the workbench showing one tab per open file. Tabs filter to the active space. Clicking × on a tab removes that file from the workbench.
+
+### PDF Text Editor — Install Missing Fonts
+
+When a PDF uses a font that isn't embedded, the **Fonts on this page** panel flags it as MISSING. A **Download & install font** button fetches the matching family from Google Fonts and installs it permanently on the server (`customFiles/static/fonts/`), so it survives reloads and is shared across sessions. The font is verified by actually measuring that its glyphs render before the badge flips to PERFECT, and the editor canvas re-renders the text in the real font automatically — no manual reload. Text colour is preserved from the original PDF.
 
 ### Sign Tool — Saved Signatures
 
@@ -85,11 +93,64 @@ For full installation options (including desktop and Kubernetes), see our [Docum
 - **Community** [Discord](https://discord.gg/HYmhKj45pU)
 - **Bug Reports**: [Github issues](https://github.com/Stirling-Tools/Stirling-PDF/issues)
 
+## Running Locally
+
+### Prerequisites
+
+| Tool | Version | Notes |
+|------|---------|-------|
+| [Task](https://taskfile.dev/installation/) | ≥ 3.x | Unified command runner (`task dev`) |
+| JDK | 25 | Auto-provisioned by Gradle on first run — no manual install needed |
+| Node.js | ≥ 22 LTS | Required for the frontend |
+
+**Windows only — allow npm scripts in PowerShell** (one-time, in a new PowerShell window):
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+```
+Or use **Git Bash / cmd** instead of PowerShell — they don't have this restriction.
+
+### Install dependencies
+
+```bash
+task install
+```
+
+### Start backend + frontend together
+
+```bash
+task dev
+```
+
+This picks two free ports (default 8080 for backend, 5173 for frontend) and opens the app in your browser automatically. The backend recompiles on save; the frontend has Vite HMR.
+
+### Start them separately
+
+```bash
+task backend:dev    # Spring Boot on :8080
+task frontend:dev   # Vite dev server on :5173
+```
+
+When running separately the frontend proxies API calls to `http://localhost:8080` by default.
+
+### Other useful commands
+
+```bash
+task                    # List common commands
+task --list             # List all available tasks
+task frontend:typecheck # TypeScript type-check
+task frontend:lint      # ESLint + cycle detection
+task frontend:test      # Run tests
+```
+
+For desktop app (Tauri) development, see [frontend/README.md](frontend/README.md#tauri).
+
+---
+
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-This project uses [Task](https://taskfile.dev/) as a unified command runner for all build, dev, and test commands. Run `task dev` to get started running the editor, run `task` to see the most common commands, or see the [Developer Guide](DeveloperGuide.md) for full details.
+This project uses [Task](https://taskfile.dev/) as a unified command runner for all build, dev, and test commands. See the [Developer Guide](DeveloperGuide.md) for full details.
 
 For adding translations, see the [Translation Guide](devGuide/HowToAddNewLanguage.md).
 

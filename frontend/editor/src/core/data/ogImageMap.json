@@ -14,7 +14,6 @@
   "split": "split",
   "merge": "mergePdfs",
   "convert": "convert",
-  "ocr": "ocr",
   "addImage": "add-image",
   "rotate": "rotate",
   "annotate": "annotate",

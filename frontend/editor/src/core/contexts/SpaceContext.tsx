@@ -9,6 +9,10 @@ import React, {
 } from "react";
 import type { Space, SpaceId } from "@app/types/space";
 import { SPACE_COLORS } from "@app/types/space";
+import {
+  registerFilesConsumedCallback,
+  unregisterFilesConsumedCallback,
+} from "@app/contexts/file/fileActions";
 
 export interface SpaceContextValue {
   spaces: Space[];
@@ -152,6 +156,21 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  // When files are consumed (input replaced by outputs), inherit the space assignment.
+  useEffect(() => {
+    const handler = (inputIds: string[], outputIds: string[]) => {
+      setFileSpaceMap((prev) => {
+        const spaceId = inputIds.map((id) => prev[id]).find(Boolean);
+        if (!spaceId) return prev;
+        const next = { ...prev };
+        outputIds.forEach((id) => { next[id] = spaceId; });
+        return next;
+      });
+    };
+    registerFilesConsumedCallback(handler);
+    return () => unregisterFilesConsumedCallback(handler);
+  }, []);
 
   const value = useMemo<SpaceContextValue>(
     () => ({
