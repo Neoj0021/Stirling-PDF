@@ -9,7 +9,6 @@ import CompressIcon from "@mui/icons-material/Compress";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import CropIcon from "@mui/icons-material/Crop";
-import TextFieldsIcon from "@mui/icons-material/TextFields";
 
 export interface SuggestedTool {
   id: ToolId;

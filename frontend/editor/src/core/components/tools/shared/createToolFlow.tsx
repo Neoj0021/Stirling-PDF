@@ -142,16 +142,21 @@ export function createToolFlow<TParams = unknown>(
             const eb = config.executeButton;
             const hasFiles = (config.files.selectedFiles?.length ?? 0) > 0;
             // Compute the disabled reason from structured fields; explicit disabledReason wins if set.
-            const effectiveDisabledReason: ExecuteDisabledReason =
+            // Endpoint availability no longer locks the button — every tool is
+            // enabled by default (no "sign in to unlock"). Tools that need an
+            // external backend program simply error at run time if it's missing.
+            const rawDisabledReason: ExecuteDisabledReason =
               eb.disabledReason !== undefined
                 ? eb.disabledReason
-                : eb.endpointEnabled === false
-                  ? "endpointUnavailable"
-                  : !hasFiles
-                    ? "noFiles"
-                    : eb.paramsValid === false
-                      ? "invalidParams"
-                      : null;
+                : !hasFiles
+                  ? "noFiles"
+                  : eb.paramsValid === false
+                    ? "invalidParams"
+                    : null;
+            const effectiveDisabledReason: ExecuteDisabledReason =
+              rawDisabledReason === "endpointUnavailable"
+                ? null
+                : rawDisabledReason;
             return (
               <>
                 <ScopedOperationButton

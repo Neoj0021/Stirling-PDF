@@ -456,8 +456,7 @@ const Compare = (props: BaseToolProps) => {
     baseSlot &&
     compSlot &&
     baseSlot.stirlingFile.fileId !== compSlot.stirlingFile.fileId &&
-    !base.operation.isLoading &&
-    base.endpointEnabled !== false,
+    !base.operation.isLoading,
   );
 
   const hasBothSelected = Boolean(baseSlot && compSlot);
@@ -604,8 +603,7 @@ const Compare = (props: BaseToolProps) => {
       onClick: handleExecuteCompare,
       disabled: !canExecute,
       // Explicitly null so the noFiles gate is bypassed — Compare manages its own slot state
-      disabledReason:
-        base.endpointEnabled === false ? "endpointUnavailable" : null,
+      disabledReason: null,
       testId: "compare-execute",
       disableScopeHints: true,
     },

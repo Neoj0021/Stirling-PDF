@@ -1115,6 +1115,34 @@ const EmbedPdfViewerContent = ({
   const [pageMeasureScales, setPageMeasureScales] =
     useState<PageMeasureScales | null>(null);
 
+  // Bottom toolbar auto-hide: hide while scrolling, reveal when the cursor is in
+  // the bottom quarter of the viewport (so it doesn't block the horizontal
+  // scrollbar or page content while reading).
+  const [isBottomBarVisible, setIsBottomBarVisible] = useState(true);
+  const cursorInRevealZoneRef = useRef(false);
+
+  useEffect(() => {
+    if (!effectiveFile) return;
+    const inRevealZone = (clientY: number) =>
+      clientY >= window.innerHeight * 0.75;
+    const handleMouseMove = (e: MouseEvent) => {
+      cursorInRevealZoneRef.current = inRevealZone(e.clientY);
+      setIsBottomBarVisible(cursorInRevealZoneRef.current);
+    };
+    // Scrolling hides the bar unless the cursor is parked in the reveal zone.
+    const handleScroll = () => {
+      if (!cursorInRevealZoneRef.current) setIsBottomBarVisible(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("wheel", handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("wheel", handleScroll);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [effectiveFile]);
+
   useEffect(() => {
     const file = effectiveFile?.file;
     if (!file) {
@@ -1327,7 +1355,8 @@ const EmbedPdfViewerContent = ({
         <div
           style={{
             position: "fixed",
-            bottom: 0,
+            // Raised off the very bottom so it clears the horizontal scrollbar.
+            bottom: 16,
             left: 0,
             right: 0,
             zIndex: 50,
@@ -1335,9 +1364,17 @@ const EmbedPdfViewerContent = ({
             justifyContent: "center",
             pointerEvents: "none",
             background: "transparent",
+            // Auto-hide: slide down + fade out unless revealed.
+            transform: isBottomBarVisible
+              ? "translateY(0)"
+              : "translateY(160%)",
+            opacity: isBottomBarVisible ? 1 : 0,
+            transition: "transform 0.25s ease, opacity 0.25s ease",
           }}
         >
-          <div style={{ pointerEvents: "auto" }}>
+          <div
+            style={{ pointerEvents: isBottomBarVisible ? "auto" : "none" }}
+          >
             <PdfViewerToolbar
               currentPage={scrollState.currentPage}
               totalPages={scrollState.totalPages}

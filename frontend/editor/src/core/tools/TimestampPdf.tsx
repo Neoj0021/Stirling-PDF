@@ -44,8 +44,7 @@ const TimestampPdf = (props: BaseToolProps) => {
       onClick: base.handleExecute,
       disabled:
         !base.params.validateParameters() ||
-        !base.hasFiles ||
-        !base.endpointEnabled,
+        !base.hasFiles,
     },
     review: {
       isVisible: base.hasResults,

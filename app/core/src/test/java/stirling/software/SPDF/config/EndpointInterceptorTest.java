@@ -15,7 +15,6 @@ import jakarta.servlet.http.HttpServletResponse;
 @ExtendWith(MockitoExtension.class)
 class EndpointInterceptorTest {
 
-    @Mock private EndpointConfiguration endpointConfiguration;
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
 
@@ -23,23 +22,26 @@ class EndpointInterceptorTest {
 
     @BeforeEach
     void setUp() {
-        interceptor = new EndpointInterceptor(endpointConfiguration);
+        interceptor = new EndpointInterceptor();
     }
 
     @Test
-    void preHandleAllowsEnabledEndpoint() throws Exception {
-        when(request.getRequestURI()).thenReturn("/api/v1/general/remove-pages");
-        when(endpointConfiguration.isEndpointEnabledForUri("/api/v1/general/remove-pages"))
-                .thenReturn(true);
+    void preHandleAllowsAllRequests() throws Exception {
+        when(request.getServletPath()).thenReturn("/api/v1/general/remove-pages");
         assertTrue(interceptor.preHandle(request, response, new Object()));
     }
 
     @Test
-    void preHandleBlocksDisabledEndpoint() throws Exception {
-        when(request.getRequestURI()).thenReturn("/api/v1/general/remove-pages");
-        when(endpointConfiguration.isEndpointEnabledForUri("/api/v1/general/remove-pages"))
-                .thenReturn(false);
-        assertFalse(interceptor.preHandle(request, response, new Object()));
-        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, "This endpoint is disabled");
+    void preHandleSetsCacheControlForApiPaths() throws Exception {
+        when(request.getServletPath()).thenReturn("/api/v1/convert/pdf/img");
+        interceptor.preHandle(request, response, new Object());
+        verify(response).setHeader("Cache-Control", "private, no-store");
+    }
+
+    @Test
+    void preHandleSkipsCacheControlForNonApiPaths() throws Exception {
+        when(request.getServletPath()).thenReturn("/some-page");
+        interceptor.preHandle(request, response, new Object());
+        verify(response, never()).setHeader(anyString(), anyString());
     }
 }

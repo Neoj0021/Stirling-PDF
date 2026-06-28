@@ -173,8 +173,7 @@ const ShowJS = (props: BaseToolProps) => {
         : !base.hasFiles ||
           (base.selectedFiles?.length ?? 0) !== 1 ||
           base.operation.isLoading ||
-          base.endpointLoading ||
-          base.endpointEnabled === false,
+          base.endpointLoading,
       isVisible: true,
     },
     review: {
